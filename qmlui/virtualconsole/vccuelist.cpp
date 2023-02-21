@@ -259,11 +259,11 @@ void VCCueList::setSideFaderLevel(int level)
         int newStep = level; // by default we assume the Chaser has more than 256 steps
         if (ch->stepsCount() < 256)
         {
-            float stepSize = 255 / float(ch->stepsCount());
+            float stepSize = 256 / float(ch->stepsCount()); //divide the steps across the full 0..255 range
             if(level >= 255 - stepSize)
                 newStep = ch->stepsCount() - 1;
             else
-                newStep = qFloor(qreal(level) / qreal(stepSize));
+                newStep = qFloor((qreal(level) / qreal(stepSize)) + 0.0001); //adjust for slight floating point offsets
         }
         //qDebug() << "value:" << value << "steps:" << ch->stepsCount() << "new step:" << newStep;
 
