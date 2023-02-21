@@ -25,17 +25,21 @@
 #include "vcwidget.h"
 
 #define KXMLQLCVCCueList                    QString("CueList")
+//Function
 #define KXMLQLCVCCueListChaser              QString("Chaser")
 #define KXMLQLCVCCueListPlaybackLayout      QString("PlaybackLayout")
 #define KXMLQLCVCCueListNextPrevBehavior    QString("NextPrevBehavior")
 #define KXMLQLCVCCueListCrossfade           QString("Crossfade")
+//Blend
+//Linked
 #define KXMLQLCVCCueListNext                QString("Next")
 #define KXMLQLCVCCueListPrevious            QString("Previous")
 #define KXMLQLCVCCueListPlayback            QString("Playback")
 #define KXMLQLCVCCueListStop                QString("Stop")
-#define KXMLQLCVCCueListSlidersMode         QString("SlidersMode")
 #define KXMLQLCVCCueListCrossfadeLeft       QString("CrossLeft")
 #define KXMLQLCVCCueListCrossfadeRight      QString("CrossRight")
+#define KXMLQLCVCCueListSlidersMode         QString("SlidersMode")
+#define KXMLQLCVCCueListStepsExtValueMode   QString("StepsExtValueMode")
 
 class ListModel;
 
@@ -56,6 +60,8 @@ class VCCueList : public VCWidget
 
     Q_PROPERTY(PlaybackStatus playbackStatus READ playbackStatus NOTIFY playbackStatusChanged)
     Q_PROPERTY(int playbackIndex READ playbackIndex WRITE setPlaybackIndex NOTIFY playbackIndexChanged)
+    
+    Q_PROPERTY(StepsExtValueMode stepsExtValueMode READ stepsExtValueMode WRITE setStepsExtValueMode NOTIFY stepsExtValueModeChanged)
 
     /*********************************************************************
      * Initialization
@@ -133,6 +139,16 @@ public:
         Steps
     };
     Q_ENUM(FaderMode)
+    
+    /* Steps - External Value Mode */
+    enum StepsExtValueMode
+    {
+        StepsExtValueModeScaled = 0,
+        StepsExtValueModeDirectDMX,
+        StepsExtValueModeDirectMIDI
+    };
+    Q_ENUM(StepsExtValueMode)
+    
 
     /** Get/Set the side fader mode */
     FaderMode sideFaderMode() const;
@@ -141,6 +157,14 @@ public:
     /** Convert side fader mode <-> string */
     FaderMode stringToFaderMode(QString modeStr);
     QString faderModeToString(FaderMode mode);
+
+    /** Get/Set the External Value mode for Steps mode */
+    StepsExtValueMode stepsExtValueMode() const;
+    void setStepsExtValueMode(StepsExtValueMode mode);
+
+    /** Convert Steps External Value Mode <-> string */
+    StepsExtValueMode stringToStepsExtValueMode(QString modeStr);
+    QString stepsExtValueModeToString(StepsExtValueMode mode);
 
     /** Get/Set the side fader level */
     int sideFaderLevel() const;
@@ -159,9 +183,11 @@ signals:
     void sideFaderLevelChanged();
     void primaryTopChanged();
     void nextStepIndexChanged();
+    void stepsExtValueModeChanged();
 
 private:
     FaderMode m_slidersMode;
+    StepsExtValueMode m_stepsExtValueMode;
     int m_sideFaderLevel;
     int m_nextStepIndex;
     bool m_primaryTop;

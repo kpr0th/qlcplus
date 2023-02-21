@@ -118,6 +118,28 @@ by double clicking on the Cue List widget.<br>
    </UL>
   </TD>
  </TR>
+ <TR>
+  <TD>
+   <B>Step mode for external input values</B>
+  </TD>
+  <TD>
+   If Side Fader is set to Steps mode, this option allows selection of an alternate interpretation
+   of external input values that is designed to be easier to use from automation software.<br>
+   <UL>
+    <LI>The "Default" option will scale the external input value so that the full 0-255 range is mapped
+	 onto the available chaser steps.  An input value of 255 translates to the 1st step (top of the list),
+	 and an input value of 0 translates to the last step (bottom of the list), and the values in between are
+	 scaled proportionally to the number of steps defined in the chaser.</LI>
+	<LI>The "Direct Step #" option treats the input value as a specific step number. 
+	 A value of 1 means the 1st step, a value of 10 means the 10th step, and so on.  
+	 Any value outside the range of actual step numbers is forced back within the defined range, 
+	 so that a value of 0 selects the 1st step, and a value greater than the number of steps selects the last step.</LI>
+	<LI>The " Direct Step # (MIDI)" option works the same as the "Direct Step #" option, but it adjusts
+	 the input value back to the allowable MIDI range of 0-127 first, so that the value sent in the MIDI message
+	 still translates directly to a step number.</LI>
+   </UL>
+  </TD>
+ </TR>
 </TABLE>
 
 <br>

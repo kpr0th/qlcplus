@@ -74,6 +74,7 @@ const QSize VCButton::defaultSize(QSize(50, 50));
 
 VCButton::VCButton(QWidget* parent, Doc* doc) : VCWidget(parent, doc)
     , m_iconPath()
+    , m_extValueModeEnabled(false)
     , m_blackoutFadeOutTime(0)
     , m_startupIntensityEnabled(false)
     , m_startupIntensity(1.0)
@@ -169,6 +170,7 @@ bool VCButton::copyFrom(const VCWidget* widget)
     setStartupIntensity(button->startupIntensity());
     setStopAllFadeOutTime(button->stopAllFadeTime());
     setAction(button->action());
+    enableExtValueMode(button->isExtValueModeEnabled());
     m_state = button->m_state;
 
     /* Copy common stuff */
@@ -550,6 +552,25 @@ void VCButton::slotInputValueChanged(quint32 universe, quint32 channel, uchar va
             else if (state() == Active && value == 0)
                 releaseFunction();
         }
+        else if (m_action == Toggle && isExtValueModeEnabled()) 
+        {
+            // External input sets on/off explicitly based on value, instead of just toggling to the 
+            // opposite state, to avoid unwanted toggling if a MIDI cue or other external input is 
+            // accidentally repeated.
+            if (value > 0 && !(state() == Active))
+            {
+                pressFunction();
+            }
+            else if (value == 0 && state() == Active)
+            {
+                // **NOTE: a "Monitoring" button (yellow border - running as a child) won't be 
+                //  turned off as currently coded, because it's not "Active".
+                //  This seems OK, because the button wasn't used to turn the function on.
+                //  If this ever needs to change, pressFunction or releaseFunction would also 
+                //  need work to support it.
+                pressFunction();
+            }
+        }
         else
         {
             if (value > 0)
@@ -589,7 +610,7 @@ void VCButton::setAction(Action action)
     if (m_action == Blackout)
         setToolTip(tr("Toggle Blackout"));
     else if (m_action == StopAll)
-        setToolTip(tr("Stop ALL functions!"));
+        setToolTip(tr("Stop ALL functioOns!"));
 }
 
 VCButton::Action VCButton::action() const
@@ -619,6 +640,16 @@ VCButton::Action VCButton::stringToAction(const QString& str)
         return StopAll;
     else
         return Toggle;
+}
+
+bool VCButton::isExtValueModeEnabled() const
+{
+    return m_extValueModeEnabled;
+}
+
+void VCButton::enableExtValueMode(bool enable)
+{
+    m_extValueModeEnabled = enable;
 }
 
 void VCButton::setStopAllFadeOutTime(int ms)
@@ -686,10 +717,7 @@ void VCButton::pressFunction()
         if (f == NULL)
             return;
 
-        // if the button is in a SoloFrame and the function is running but was
-        // started by a different function (a chaser or collection), turn other
-        // functions off and start this one.
-        if (state() == Active && !(isChildOfSoloFrame() && f->startedAsChild()))
+        if (state() == Active) // && !(isChildOfSoloFrame() && f->startedAsChild()))
         {
             f->stop(functionParent());
             resetIntensityOverrideAttribute();
@@ -915,6 +943,8 @@ bool VCButton::loadXML(QXmlStreamReader &root)
         {
             QXmlStreamAttributes attrs = root.attributes();
             setAction(stringToAction(root.readElementText()));
+            if (attrs.hasAttribute(KXMLQLCVCButtonExtValueMode))
+                enableExtValueMode(attrs.value(KXMLQLCVCButtonExtValueMode) == KXMLQLCTrue);
             if (attrs.hasAttribute(KXMLQLCVCButtonStopAllFadeTime))
                 setStopAllFadeOutTime(attrs.value(KXMLQLCVCButtonStopAllFadeTime).toString().toInt());
         }
@@ -971,6 +1001,10 @@ bool VCButton::saveXML(QXmlStreamWriter *doc)
     /* Action */
     doc->writeStartElement(KXMLQLCVCButtonAction);
 
+    if (action() == Toggle && isExtValueModeEnabled())
+    {
+        doc->writeAttribute(KXMLQLCVCButtonExtValueMode, KXMLQLCTrue);
+    }
     if (action() == StopAll && stopAllFadeTime() != 0)
     {
         doc->writeAttribute(KXMLQLCVCButtonStopAllFadeTime, QString::number(stopAllFadeTime()));
