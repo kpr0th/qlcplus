@@ -819,17 +819,17 @@ void VCCueList::slotCurrentStepChanged(int stepNumber)
             stepVal = 256.0 / (float)stepsCount; //divide the steps across the full 0..255 range
         else
             stepVal = 1.0;
-        // value->step# truncates down in slotSideFaderValueChanged; so use ceiling for step#->value for full parity
-        int slValue = qCeil((stepVal * (float)stepNumber)-0.00001); // adjusted slightly due to floating point math
-        float slRemainder = 0.0;
+        // value->step# truncates down in slotSideFaderValueChanged; so use ceiling for step#->value for full parity,
+        // and adjusted slightly to avoid whole numbers belonging to 2 different step's ranges
+        int slValue = qCeil((stepVal * (float)stepNumber)-0.00001); 
+        float slRemainder = 0.0; // grab the remainder and use it when calculating lowerBound, to line up with next step's display value
         if (slValue > 255)
             slValue = 255;
         else
             slRemainder = ((stepVal * (float)stepNumber)-0.00001) - slValue;  // will be a small negative #
 
         int upperBound = 255 - slValue;
-        // include remainder to line up better with the next step's expected display value; and apply floating point adjustment too
-        int lowerBound = qFloor((float)255 - slValue - slRemainder - stepVal + 0.00001) + 1;
+        int lowerBound = qFloor((float)255 - slValue - slRemainder - stepVal + 0.00001) + 1; // slight adjustment to avoid whole #'s also
         //qDebug() << "Slider value:" << m_sideFader->value() << "->" << 255-slValue << "( disp:" << slValue << ") Step range:" << upperBound << lowerBound;
         // if the Step slider is already in range, then do not set its value
         // this means a user interaction is going on, either with the mouse or external controller
@@ -1145,7 +1145,8 @@ void VCCueList::slotSideFaderValueChanged(int value)
             if(value >= 255.0 - stepSize)
                 newStep = ch->stepsCount() - 1;
             else
-                newStep = qFloor(((float)value / stepSize) + 0.00001); //adjust for slight floating point offsets
+                newStep = qFloor(((float)value / stepSize) + 0.00001); 
+                //adjusted slightly to avoid whole numbers belonging to 2 different step's ranges
         }
         //qDebug() << "value:" << value << "steps:" << ch->stepsCount() << "new step:" << newStep;
 
