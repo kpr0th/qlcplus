@@ -97,6 +97,7 @@ VCCueList::VCCueList(QWidget *parent, Doc *doc) : VCWidget(parent, doc)
     , m_secondaryIndex(0)
     , m_primaryTop(true)
     , m_slidersMode(None)
+    , m_stepsExtValueMode(StepsExtValueModeScaled)
 {
     /* Set the class name "VCCueList" as the object name as well */
     setObjectName(VCCueList::staticMetaObject.className());
@@ -328,6 +329,9 @@ bool VCCueList::copyFrom(const VCWidget *widget)
 
     /* Sliders mode */
     setSideFaderMode(cuelist->sideFaderMode());
+    
+    /* Steps Ext Value Mode */
+    setStepsExtValueMode(cuelist->stepsExtValueMode());
 
     /* Common stuff */
     return VCWidget::copyFrom(widget);
@@ -1090,6 +1094,38 @@ QString VCCueList::faderModeToString(VCCueList::FaderMode mode)
     return "None";
 }
 
+
+VCCueList::StepsExtValueMode VCCueList::stepsExtValueMode() const
+{
+    return m_stepsExtValueMode;
+}
+
+void VCCueList::setStepsExtValueMode(VCCueList::StepsExtValueMode mode)
+{
+    m_stepsExtValueMode = mode;
+}
+
+VCCueList::StepsExtValueMode VCCueList::stringToStepsExtValueMode(QString modeStr)
+{
+    if (modeStr == "DirectDMX")
+        return StepsExtValueModeDirectDMX;
+    else if (modeStr == "DirectMIDI")
+        return StepsExtValueModeDirectMIDI;
+
+    return StepsExtValueModeScaled;
+}
+
+QString VCCueList::stepsExtValueModeToString(VCCueList::StepsExtValueMode mode)
+{
+    if (mode == StepsExtValueModeDirectDMX)
+        return "DirectDMX";
+    else if (mode == StepsExtValueModeDirectMIDI)
+        return "DirectMIDI";
+
+    return "Scaled";
+}
+
+
 /*****************************************************************************
  * Crossfade
  *****************************************************************************/
@@ -1370,7 +1406,31 @@ void VCCueList::slotInputValueChanged(quint32 universe, quint32 channel, uchar v
         if (sideFaderMode() == None)
             return;
 
-        float val = SCALE((float) value, (float) 0, (float) UCHAR_MAX,
+        float newValue = (float) value;
+        float minValue = (float) 0;
+        float maxValue = (float) UCHAR_MAX;
+        if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && chaser() != NULL)
+        {
+            minValue = (float) 1;
+            maxValue = (float) (m_tree->topLevelItemCount() > 0 ? m_tree->topLevelItemCount() : UCHAR_MAX);
+
+            if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
+            {
+                minValue = (float) 2;
+                maxValue = maxValue*2; //MIDI input gets multiplied by 2 on the way in; undo it here...
+            }
+
+            if (maxValue > (float) UCHAR_MAX)
+                maxValue = (float) UCHAR_MAX; // but don't allow a max input value higher than max-DMX...
+            
+            if (newValue < minValue)
+                newValue = minValue; // cue list #'ing is 1..StepCount; fix a 0 input value to mean step 1 also
+            if (newValue > maxValue)
+                newValue = maxValue; // don't accept new values higher than the highest step count
+            
+            newValue = (maxValue - newValue + minValue); // invert value since normally 255 means step 1
+        }
+        float val = SCALE(newValue, minValue, maxValue,
                           (float) m_sideFader->minimum(),
                           (float) m_sideFader->maximum());
         m_sideFader->setValue(val);
@@ -1556,6 +1616,10 @@ bool VCCueList::loadXML(QXmlStreamReader &root)
         {
             setSideFaderMode(stringToFaderMode(root.readElementText()));
         }
+        else if (root.name() == KXMLQLCVCCueListStepsExtValueMode)
+        {
+            setStepsExtValueMode(stringToStepsExtValueMode(root.readElementText()));
+        }
         else if (root.name() == KXMLQLCVCCueListCrossfadeLeft)
         {
             loadXMLSources(root, sideFaderInputSourceId);
@@ -1699,6 +1763,10 @@ bool VCCueList::saveXML(QXmlStreamWriter *doc)
     /* Crossfade cue list */
     if (sideFaderMode() != None)
         doc->writeTextElement(KXMLQLCVCCueListSlidersMode, faderModeToString(sideFaderMode()));
+
+    /* Steps External Value Mode */
+    if (stepsExtValueMode() != StepsExtValueModeScaled)
+        doc->writeTextElement(KXMLQLCVCCueListStepsExtValueMode, stepsExtValueModeToString(stepsExtValueMode()));
 
     QSharedPointer<QLCInputSource> cf1Src = inputSource(sideFaderInputSourceId);
     if (!cf1Src.isNull() && cf1Src->isValid())

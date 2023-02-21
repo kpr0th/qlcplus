@@ -33,6 +33,7 @@
 #define KXMLQLCVCButtonActionBlackout   QString("Blackout")
 #define KXMLQLCVCButtonActionStopAll    QString("StopAll")
 
+#define KXMLQLCVCButtonExtValueMode     QString("ExtValueMode")
 #define KXMLQLCVCButtonStopAllFadeTime  QString("FadeOut")
 
 #define KXMLQLCVCButtonIntensity        QString("Intensity")
@@ -49,6 +50,7 @@ class VCButton : public VCWidget
     Q_PROPERTY(quint32 functionID READ functionID WRITE setFunctionID NOTIFY functionIDChanged)
     Q_PROPERTY(bool startupIntensityEnabled READ startupIntensityEnabled WRITE setStartupIntensityEnabled NOTIFY startupIntensityEnabledChanged)
     Q_PROPERTY(qreal startupIntensity READ startupIntensity WRITE setStartupIntensity NOTIFY startupIntensityChanged)
+    Q_PROPERTY(bool extValueModeEnabled READ extValueModeEnabled WRITE setExtValueModeEnabled NOTIFY extValueModeChanged)
     Q_PROPERTY(int stopAllFadeOutTime READ stopAllFadeOutTime WRITE setStopAllFadeOutTime NOTIFY stopAllFadeOutTimeChanged)
 
     /*********************************************************************
@@ -177,16 +179,25 @@ public:
 
     void setStopAllFadeOutTime(int ms);
     int stopAllFadeOutTime() const;
+    
+    /** Toggle by External Value mode */
+    bool extValueModeEnabled() const;
+    void setExtValueModeEnabled(bool enable);
+
 
 signals:
     void actionTypeChanged(ButtonAction actionType);
     void stopAllFadeOutTimeChanged();
+    void extValueModeChanged();
 
 protected:
     ButtonAction m_actionType;
     /** if button action is StopAll, this indicates the time
      *  in milliseconds of fadeout before stopping */
     int m_stopAllFadeOutTime;
+    /** if button action is Toggle, this controls the alternate
+     *  external input value interpretation mode */
+    bool m_extValueModeEnabled;
 
     /*****************************************************************************
      * Function startup intensity adjustment
