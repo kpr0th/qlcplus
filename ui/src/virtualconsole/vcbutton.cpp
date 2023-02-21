@@ -771,7 +771,7 @@ void VCButton::slotFunctionRunning(quint32 fid)
     {
         if (state() == Inactive)
             setState(Monitoring);
-        emit functionStarting(m_function);
+        //emit functionStarting(m_function); //don't stop Active function
     }
 }
 
