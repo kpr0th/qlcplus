@@ -216,6 +216,28 @@ bool ChaserEditor::moveSteps(QVariantList indicesList, int insertIndex)
     return true;
 }
 
+bool ChaserEditor::duplicateSteps(QVariantList indicesList)
+{
+    if (m_chaser == nullptr || indicesList.count() == 0)
+        return false;
+
+    for (QVariant &vIndex : indicesList)
+    {
+        int stepIndex = vIndex.toInt();
+        ChaserStep *sourceStep = m_chaser->stepAt(stepIndex);
+        ChaserStep step(*sourceStep);
+        m_chaser->addStep(step);
+
+        Tardis::instance()->enqueueAction(Tardis::ChaserAddStep, m_chaser->id(), QVariant(),
+            Tardis::instance()->actionToByteArray(Tardis::ChaserAddStep, m_chaser->id(), m_chaser->stepsCount() - 1));
+    }
+
+    updateStepsList(m_doc, m_chaser, m_stepsList);
+    emit stepsListChanged();
+
+    return true;
+}
+
 void ChaserEditor::setSequenceStepValue(SceneValue &scv)
 {
     if (m_chaser == nullptr || m_chaser->type() != Function::SequenceType)
@@ -238,7 +260,8 @@ void ChaserEditor::setPlaybackIndex(int playbackIndex)
     if (m_playbackIndex == playbackIndex)
         return;
 
-    if (m_chaser != nullptr && m_chaser->type() == Function::SequenceType && playbackIndex >= 0)
+    if (m_chaser != nullptr && m_previewEnabled == false &&
+        m_chaser->type() == Function::SequenceType && playbackIndex >= 0)
     {
         Sequence *sequence = qobject_cast<Sequence*>(m_chaser);
         Scene *currScene = qobject_cast<Scene*> (m_doc->function(sequence->boundSceneID()));
@@ -270,6 +293,26 @@ void ChaserEditor::setPreviewEnabled(bool enable)
     FunctionEditor::setPreviewEnabled(enable);
 }
 
+void ChaserEditor::gotoPreviousStep()
+{
+    ChaserAction action;
+    action.m_action = ChaserPreviousStep;
+    action.m_masterIntensity = 1.0;
+    action.m_stepIntensity = 1.0;
+    action.m_fadeMode = Chaser::FromFunction;
+    m_chaser->setAction(action);
+}
+
+void ChaserEditor::gotoNextStep()
+{
+    ChaserAction action;
+    action.m_action = ChaserNextStep;
+    action.m_masterIntensity = 1.0;
+    action.m_stepIntensity = 1.0;
+    action.m_fadeMode = Chaser::FromFunction;
+    m_chaser->setAction(action);
+}
+
 void ChaserEditor::deleteItems(QVariantList list)
 {
     if (m_chaser == nullptr)
@@ -295,6 +338,36 @@ void ChaserEditor::deleteItems(QVariantList list)
 
     updateStepsList(m_doc, m_chaser, m_stepsList);
     emit stepsListChanged();
+}
+
+void ChaserEditor::removeFixtures(QVariantList list)
+{
+    if (m_chaser == nullptr)
+        return;
+
+    Sequence *sequence = qobject_cast<Sequence *>(m_chaser);
+    Scene *scene = qobject_cast<Scene *>(m_doc->function(sequence->boundSceneID()));
+    if (scene == nullptr)
+        return;
+
+    // transform the list of fixture indices into a list of fixture IDs
+    QList<quint32> sceneFixtureList = scene->fixtures();
+    QList<quint32> fixtureIdList;
+    for (QVariant &fIndex : list)
+        fixtureIdList.append(sceneFixtureList.at(fIndex.toInt()));
+
+    // run though steps and search for matching fixture IDs
+    for (int i = 0; i < m_chaser->stepsCount(); i++)
+    {
+        ChaserStep *step = m_chaser->stepAt(i);
+        QMutableListIterator<SceneValue> it(step->values);
+        while (it.hasNext())
+        {
+            SceneValue scv = it.next();
+            if (fixtureIdList.contains(scv.fxi))
+                it.remove();
+        }
+    }
 }
 
 void ChaserEditor::slotStepIndexChanged(int index)

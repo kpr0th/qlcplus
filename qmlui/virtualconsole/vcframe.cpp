@@ -37,6 +37,7 @@
 #define INPUT_PREVIOUS_PAGE_ID  1
 #define INPUT_ENABLE_ID         2
 #define INPUT_COLLAPSE_ID       3
+#define INPUT_SHORTCUT_BASE_ID  20
 
 static const quint64 encKey = 0x5131632B5067334B; // this is "Q1c+Pg3K"
 
@@ -48,12 +49,12 @@ VCFrame::VCFrame(Doc *doc, VirtualConsole *vc, QObject *parent)
     , m_isCollapsed(false)
     , m_multiPageMode(false)
     , m_currentPage(0)
-    , m_totalPagesNumber(1)
     , m_pagesLoop(false)
     , m_PIN(0)
     , m_validatedPIN(false)
 {
     setType(VCWidget::FrameWidget);
+    setTotalPagesNumber(1);
 
     registerExternalControl(INPUT_NEXT_PAGE_ID, tr("Next Page"), true);
     registerExternalControl(INPUT_PREVIOUS_PAGE_ID, tr("Previous Page"), true);
@@ -593,6 +594,8 @@ void VCFrame::setDisabled(bool disable)
         widget->setDisabled(disable);
 
     VCWidget::setDisabled(disable);
+
+    updateFeedback();
 }
 /*********************************************************************
  * Header
@@ -672,8 +675,28 @@ void VCFrame::setTotalPagesNumber(int num)
     if (m_totalPagesNumber == num)
         return;
 
+    if (num < m_totalPagesNumber)
+    {
+        for (int i = m_totalPagesNumber - 1; i > num; i--)
+        {
+            m_pageLabels.remove(i);
+            unregisterExternalControl(INPUT_SHORTCUT_BASE_ID + i);
+        }
+    }
+    else
+    {
+        for (int i = m_totalPagesNumber; i < num; i++)
+        {
+            QString name = tr("Page %1").arg(i + 1);
+            m_pageLabels.insert(i, name);
+            registerExternalControl(INPUT_SHORTCUT_BASE_ID + i, name, true);
+        }
+    }
+
     m_totalPagesNumber = num;
+    setDocModified();
     emit totalPagesNumberChanged(num);
+    emit pageLabelsChanged();
 }
 
 int VCFrame::totalPagesNumber() const
@@ -705,7 +728,6 @@ void VCFrame::setCurrentPage(int pageNum)
         {
             widget->setDisabled(false);
             widget->setVisible(true);
-            //widget->updateFeedback();
         }
         else
         {
@@ -713,6 +735,9 @@ void VCFrame::setCurrentPage(int pageNum)
             widget->setVisible(false);
         }
     }
+
+    updateFeedback();
+
     setDocModified();
     emit currentPageChanged(m_currentPage);
 }
@@ -723,12 +748,26 @@ void VCFrame::setPagesLoop(bool pagesLoop)
         return;
 
     m_pagesLoop = pagesLoop;
+    setDocModified();
     emit pagesLoopChanged(pagesLoop);
 }
 
 bool VCFrame::pagesLoop() const
 {
     return m_pagesLoop;
+}
+
+QStringList VCFrame::pageLabels()
+{
+    return m_pageLabels.values();
+}
+
+void VCFrame::setShortcutName(int pageIndex, QString name)
+{
+    m_pageLabels[pageIndex] = name;
+    setDocModified();
+
+    emit pageLabelsChanged();
 }
 
 void VCFrame::gotoPreviousPage()
@@ -749,6 +788,14 @@ void VCFrame::gotoNextPage()
         setCurrentPage(m_currentPage + 1);
 
     sendFeedback(m_currentPage, INPUT_NEXT_PAGE_ID);
+}
+
+void VCFrame::gotoPage(int pageIndex)
+{
+    if (pageIndex < 0 || pageIndex >= m_totalPagesNumber)
+        return;
+
+    setCurrentPage(pageIndex);
 }
 
 void VCFrame::cloneFirstPage()
@@ -841,6 +888,38 @@ void VCFrame::slotSubmasterValueChanged(qreal value)
  * External input
  *********************************************************************/
 
+void VCFrame::updateFeedback()
+{
+    if (isDisabled())
+    {
+        // temporarily revert the disabled state otherwise
+        // this feedback will never go through
+        m_isDisabled = false;
+        sendFeedback(0, INPUT_ENABLE_ID, VCWidget::LowerValue);
+        m_isDisabled = true;
+    }
+    else
+    {
+        sendFeedback(UCHAR_MAX, INPUT_ENABLE_ID, VCWidget::UpperValue);
+    }
+
+    QListIterator <VCWidget*> it(this->findChildren<VCWidget*>());
+    while (it.hasNext() == true)
+    {
+        VCWidget* child = it.next();
+        if (child->parent() == this && child->page() == currentPage())
+            child->updateFeedback();
+    }
+
+    for (int &pIdx : m_pageLabels.keys())
+    {
+        if (pIdx == m_currentPage)
+            sendFeedback(UCHAR_MAX, INPUT_SHORTCUT_BASE_ID + pIdx, VCWidget::UpperValue);
+        else
+            sendFeedback(0, INPUT_SHORTCUT_BASE_ID + pIdx, VCWidget::LowerValue);
+    }
+}
+
 void VCFrame::slotInputValueChanged(quint8 id, uchar value)
 {
     if (value != UCHAR_MAX)
@@ -859,6 +938,11 @@ void VCFrame::slotInputValueChanged(quint8 id, uchar value)
         break;
         case INPUT_COLLAPSE_ID:
             setCollapsed(!isCollapsed());
+        break;
+        default:
+            if (id < INPUT_SHORTCUT_BASE_ID || id > INPUT_SHORTCUT_BASE_ID + m_totalPagesNumber)
+                break;
+            setCurrentPage(id - INPUT_SHORTCUT_BASE_ID);
         break;
     }
 }
@@ -1050,7 +1134,7 @@ bool VCFrame::loadXML(QXmlStreamReader &root)
             if (attrs.hasAttribute(KXMLQLCVCFramePagesNumber))
                 setTotalPagesNumber(attrs.value(KXMLQLCVCFramePagesNumber).toInt());
 
-            if(attrs.hasAttribute(KXMLQLCVCFrameCurrentPage))
+            if (attrs.hasAttribute(KXMLQLCVCFrameCurrentPage))
                 currentPage = attrs.value(KXMLQLCVCFrameCurrentPage).toInt();
 
             if(attrs.hasAttribute(KXMLQLCVCFramePagesLoop))
@@ -1085,6 +1169,24 @@ bool VCFrame::loadXML(QXmlStreamReader &root)
                 setPagesLoop(true);
             else
                 setPagesLoop(false);
+        }
+        else if (root.name() == KXMLQLCVCFrameShortcut)
+        {
+            int page = 0;
+            QString name;
+
+            QXmlStreamAttributes attrs = root.attributes();
+            if (attrs.hasAttribute(KXMLQLCVCFrameShortcutPage))
+                page = attrs.value(KXMLQLCVCFrameShortcutPage).toInt();
+
+            if (attrs.hasAttribute(KXMLQLCVCFrameShortcutName))
+                name = attrs.value(KXMLQLCVCFrameShortcutName).toString();
+            m_pageLabels.insert(page, name);
+
+            registerExternalControl(INPUT_SHORTCUT_BASE_ID + page, name, true);
+            loadXMLSources(root, INPUT_SHORTCUT_BASE_ID + page);
+
+            //root.skipCurrentElement();
         }
         else
         {
@@ -1165,6 +1267,21 @@ bool VCFrame::saveXML(QXmlStreamWriter *doc)
 
         saveXMLInputControl(doc, INPUT_NEXT_PAGE_ID, KXMLQLCVCFrameNext);
         saveXMLInputControl(doc, INPUT_PREVIOUS_PAGE_ID, KXMLQLCVCFramePrevious);
+
+        /* Write shortcuts, if any */
+        QMapIterator <int, QString> it(m_pageLabels);
+        while (it.hasNext() == true)
+        {
+            it.next();
+
+            doc->writeStartElement(KXMLQLCVCFrameShortcut);
+            doc->writeAttribute(KXMLQLCVCFrameShortcutPage, QString::number(it.key()));
+            doc->writeAttribute(KXMLQLCVCFrameShortcutName, it.value());
+
+            saveXMLInputControl(doc, INPUT_SHORTCUT_BASE_ID + it.key());
+
+            doc->writeEndElement();
+        }
     }
 
     /* Save children */

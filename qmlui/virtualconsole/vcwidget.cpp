@@ -596,11 +596,18 @@ QString VCWidget::propertiesResource() const
 void VCWidget::registerExternalControl(quint8 id, QString name, bool allowKeyboard)
 {
     ExternalControlInfo info;
-    info.id = id;
     info.name = name;
     info.allowKeyboard = allowKeyboard;
 
-    m_externalControlList.append(info);
+    m_externalControlList.insert(id, info);
+}
+
+bool VCWidget::unregisterExternalControl(quint8 id)
+{
+    if (m_externalControlList.remove(id))
+        return true;
+
+    return false;
 }
 
 int VCWidget::externalControlsCount() const
@@ -612,31 +619,18 @@ QVariant VCWidget::externalControlsList() const
 {
     QVariantList controlsList;
 
-    for (ExternalControlInfo info : m_externalControlList) // C++11
+    QMapIterator<quint8, ExternalControlInfo> it(m_externalControlList);
+    while(it.hasNext())
     {
+        it.next();
+        ExternalControlInfo info = it.value();
         QVariantMap cMap;
         cMap.insert("mLabel", info.name);
-        cMap.insert("mValue", info.id);
+        cMap.insert("mValue", it.key());
         controlsList.append(cMap);
     }
 
     return QVariant::fromValue(controlsList);
-}
-
-int VCWidget::controlIndex(quint8 id)
-{
-    /* in most cases, the control ID is equal to the index in the list,
-     * so let's check that before hand */
-    if (id < m_externalControlList.count() && m_externalControlList.at(id).id == id)
-        return id;
-
-    for (int i = 0; i < m_externalControlList.count(); i++)
-        if (m_externalControlList.at(i).id == id)
-            return i;
-
-    qDebug() << "ERROR: id" << id << "not registered in controls list!";
-
-    return 0;
 }
 
 /*********************************************************************
@@ -652,11 +646,48 @@ void VCWidget::addInputSource(QSharedPointer<QLCInputSource> const& source)
      *  This is needed during the auto detection process, when the user
      *  haven't decided yet the source type */
     if (source->id() == QLCInputSource::invalidID)
-        source->setID(m_externalControlList.first().id);
+        source->setID(m_externalControlList.firstKey());
 
     m_inputSources.append(source);
 
-    // TODO: hook synthetic emitting sources here
+    // now check if the source is defined in the associated universe
+    // profile and if it has specific settings
+    InputPatch *ip = m_doc->inputOutputMap()->inputPatch(source->universe());
+    if (ip != nullptr && ip->profile() != nullptr)
+    {
+        // Do not care about the page since input profiles don't do either
+        QLCInputChannel *ich = ip->profile()->channel(source->channel() & 0x0000FFFF);
+        if (ich != nullptr)
+        {
+            if (ich->movementType() == QLCInputChannel::Relative)
+            {
+                source->setWorkingMode(QLCInputSource::Relative);
+                source->setSensitivity(ich->movementSensitivity());
+                connect(source.data(), SIGNAL(inputValueChanged(quint32,quint32,uchar)),
+                        this, SLOT(slotInputSourceValueChanged(quint32,quint32,uchar)));
+            }
+            else if (ich->type() == QLCInputChannel::Encoder)
+            {
+                source->setWorkingMode(QLCInputSource::Encoder);
+                source->setSensitivity(ich->movementSensitivity());
+                connect(source.data(), SIGNAL(inputValueChanged(quint32,quint32,uchar)),
+                        this, SLOT(slotInputSourceValueChanged(quint32,quint32,uchar)));
+            }
+            else if (ich->type() == QLCInputChannel::Button)
+            {
+                if (ich->sendExtraPress() == true)
+                {
+                    source->setSendExtraPressRelease(true);
+                    connect(source.data(), SIGNAL(inputValueChanged(quint32,quint32,uchar)),
+                            this, SLOT(slotInputSourceValueChanged(quint32,quint32,uchar)));
+                }
+
+                // user custom feedbacks have precedence over input profile custom feedbacks
+                source->setRange((source->lowerValue() != 0) ? source->lowerValue() : ich->lowerValue(),
+                                 (source->upperValue() != UCHAR_MAX) ? source->upperValue() : ich->upperValue());
+            }
+        }
+    }
 
     emit inputSourcesListChanged();
 }
@@ -760,7 +791,6 @@ QVariantList VCWidget::inputSourcesList()
             sourceMap.insert("invalid", true);
         sourceMap.insert("type", Controller);
         sourceMap.insert("id", source->id());
-        sourceMap.insert("cIndex", controlIndex(source->id()));
         sourceMap.insert("uniString", uniName);
         sourceMap.insert("chString", chName);
         sourceMap.insert("universe", source->universe());
@@ -782,7 +812,6 @@ QVariantList VCWidget::inputSourcesList()
         QVariantMap keyMap;
         keyMap.insert("type", Keyboard);
         keyMap.insert("id", id);
-        keyMap.insert("cIndex", controlIndex(id));
 
         if (seq.isEmpty())
         {
@@ -803,6 +832,15 @@ void VCWidget::slotInputValueChanged(quint8 id, uchar value)
     Q_UNUSED(value)
 }
 
+void VCWidget::slotInputSourceValueChanged(quint32 universe, quint32 channel, uchar value)
+{
+    Q_UNUSED(universe)
+    Q_UNUSED(channel)
+
+    QLCInputSource *source = qobject_cast<QLCInputSource*>(sender());
+    slotInputValueChanged(source->id(), value);
+}
+
 QSharedPointer<QLCInputSource> VCWidget::inputSource(quint32 id, quint32 universe, quint32 channel) const
 {
     for (QSharedPointer<QLCInputSource> source : m_inputSources) // C++11
@@ -816,6 +854,9 @@ QSharedPointer<QLCInputSource> VCWidget::inputSource(quint32 id, quint32 univers
 
 void VCWidget::sendFeedback(int value, quint8 id, SourceValueType type)
 {
+    if (isDisabled())
+        return;
+
     for (QSharedPointer<QLCInputSource> source : m_inputSources) // C++11
     {
         if (source->id() != id)
@@ -840,16 +881,22 @@ void VCWidget::sendFeedback(int value, quint8 id, SourceValueType type)
         InputPatch *ip = m_doc->inputOutputMap()->inputPatch(source->universe());
         if (ip != nullptr)
         {
-            QLCInputProfile* profile = ip->profile();
+            QLCInputProfile *profile = ip->profile();
             if (profile != nullptr)
             {
-                QLCInputChannel* ich = profile->channel(source->channel());
+                QLCInputChannel *ich = profile->channel(source->channel() & 0x0000FFFF);
                 if (ich != nullptr)
                     chName = ich->name();
             }
         }
         m_doc->inputOutputMap()->sendFeedBack(source->universe(), source->channel(), value, chName);
+        return;
     }
+}
+
+void VCWidget::updateFeedback()
+{
+    /* NOP */
 }
 
 /*********************************************************************

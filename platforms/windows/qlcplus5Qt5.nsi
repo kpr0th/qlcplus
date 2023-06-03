@@ -15,7 +15,7 @@
 ;--------------------------------
 ;General
 Name "Q Light Controller Plus"
-OutFile "QLC+_5.0.0_beta2.exe"
+OutFile "QLC+_5.0.0_beta3.exe"
 InstallDir C:\QLC+5
 InstallDirRegKey HKCU "Software\qlcplus" "Install_Dir"
 RequestExecutionLevel user
@@ -112,9 +112,9 @@ Section
 ;	WriteRegStr HKCR "QLightControllerPlus.Document\shell\open\command" "" '"$INSTDIR\qlcplus-qml.exe" --open "%1"'
 
 ;	WriteRegStr HKCR ".qxf" "" "QLightControllerPlusFixture.Document"
-;	WriteRegStr HKCR "QLightControllerFixturePlus.Document" "" "Q Light Controller Plus Fixture"
-;	WriteRegStr HKCR "QLightControllerFixturePlus.Document\DefaultIcon" "" "$INSTDIR\qlcplus-qml.exe,0"
-;	WriteRegStr HKCR "QLightControllerFixturePlus.Document\shell\open\command" "" '"$INSTDIR\qlcplus-qml.exe" --open "%1"'
+;	WriteRegStr HKCR "QLightControllerPlusFixture.Document" "" "Q Light Controller Plus Fixture"
+;	WriteRegStr HKCR "QLightControllerPlusFixture.Document\DefaultIcon" "" "$INSTDIR\qlcplus-qml.exe,0"
+;	WriteRegStr HKCR "QLightControllerPlusFixture.Document\shell\open\command" "" '"$INSTDIR\qlcplus-qml.exe" --open "%1"'
 
 	WriteRegStr HKCU "SOFTWARE\qlcplus" "Install_Dir" "$INSTDIR"
 

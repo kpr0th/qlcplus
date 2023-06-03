@@ -74,6 +74,16 @@ SidePanel
                         loaderSource = "qrc:/FixtureBrowser.qml"
                     animatePanel(checked)
                 }
+
+                Image
+                {
+                    x: parent.width - width - 3
+                    y: 3
+                    width: parent.height / 3
+                    height: width
+                    source: "qrc:/add.svg"
+                    sourceSize: Qt.size(width, height)
+                }
             }
 
             IconButton
@@ -134,7 +144,7 @@ SidePanel
                     y: UISettings.bigItemHeight
                     visible: false
 
-                    onValueChanged: fixtureManager.setIntensityValue(value)
+                    onValueChanged: contextManager.setChannelValueByType(QLCChannel.Intensity, value, relativeValue)
                     onClose: intToolButton.toggle()
                 }
             }
@@ -179,8 +189,8 @@ SidePanel
                 onCheckedChanged: posTool.visible = !posTool.visible
                 onCounterChanged: if (counter == 0) posTool.visible = false
 
-                property int panDegrees: 360
-                property int tiltDegrees: 270
+                property alias panDegrees: posTool.panMaxDegrees
+                property alias tiltDegrees: posTool.tiltMaxDegrees
 
                 PositionTool
                 {
@@ -189,8 +199,6 @@ SidePanel
                     x: leftSidePanel.width
                     y: UISettings.bigItemHeight
                     visible: false
-                    panMaxDegrees: posToolButton.panDegrees
-                    tiltMaxDegrees: posToolButton.tiltDegrees
                     onClose: posToolButton.toggle()
                 }
             }
@@ -218,7 +226,7 @@ SidePanel
                     visible: false
                     colorsMask: fixtureManager.colorsMask
 
-                    onColorChanged: fixtureManager.setColorValue(r * 255, g * 255, b * 255, w * 255, a * 255, uv * 255)
+                    onColorChanged: contextManager.setColorValue(Qt.rgba(r, g, b, 1.0), Qt.rgba(w, a, uv, 1.0))
                     onClose: colorToolButton.toggle()
                 }
             }

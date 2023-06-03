@@ -409,10 +409,25 @@ Popup
             CustomPopupDialog
             {
                 id: addrToolDialog
+                width: mainView.width / 3.5
                 title: qsTr("DMX Address tool")
                 standardButtons: Dialog.Close
 
-                contentItem: DMXAddressTool { }
+                contentItem:
+                    DMXAddressTool { }
+            }
+        }
+
+        ContextMenuEntry
+        {
+            id: uiConfig
+            imgSource: "qrc:/configure.svg"
+            entryText: qsTr("UI Settings")
+            onEntered: submenuItem = null
+            onClicked:
+            {
+                menuRoot.close()
+                mainView.loadResource("qrc:/UISettingsEditor.qml")
             }
         }
 
