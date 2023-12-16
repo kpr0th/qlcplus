@@ -313,5 +313,52 @@ but External Input turns the function ON if value>0 and OFF if value=0")
               }
 
         }
+
+        SectionBox
+        {
+            id: flashProperties
+            visible: widgetRef ? widgetRef.actionType === VCButton.Flash : false
+            sectionLabel: qsTr("Flash properties")
+
+            sectionContents:
+              RowLayout
+              {
+                  width: parent.width
+                  spacing: 10
+
+                  RobotoText
+                  {
+                      id: flashOverrideLabel
+                      height: UISettings.listItemHeight
+                      label: qsTr("Override priority")
+                  }
+
+                  CustomCheckBox
+                  {
+                      id: flashOverrideCheckBox
+                      implicitWidth: UISettings.iconSizeMedium
+                      implicitHeight: implicitWidth
+                      checked: widgetRef.flashOverrides
+                      onClicked: widgetRef.flashOverrides = checked
+                  }
+
+                  RobotoText
+                  {
+                      id: flashForceLTPLabel
+                      height: UISettings.listItemHeight
+                      label: qsTr("Force LTP")
+                  }
+
+                  CustomCheckBox
+                  {
+                      id: flashForceLTPCheckBox
+                      implicitWidth: UISettings.iconSizeMedium
+                      implicitHeight: implicitWidth
+                      checked: widgetRef.flashForceLTP
+                      onClicked: widgetRef.flashForceLTP = checked
+                  }
+              }
+
+        }
     } // Column
 }

@@ -26,12 +26,9 @@
 #include <QDebug>
 
 #include "chaserrunner.h"
-#include "genericfader.h"
 #include "mastertimer.h"
-#include "fadechannel.h"
 #include "chaserstep.h"
 #include "qlcmacros.h"
-#include "fixture.h"
 #include "chaser.h"
 #include "scene.h"
 #include "doc.h"
@@ -750,7 +747,11 @@ bool ChaserRunner::write(MasterTimer *timer, QList<Universe *> universes)
             if (m_pendingAction.m_stepIndex != -1)
             {
                 clearRunningList();
-                m_lastRunStepIdx = m_pendingAction.m_stepIndex;
+                if (m_chaser->runOrder() == Function::Random)
+                    m_lastRunStepIdx = randomStepIndex(m_pendingAction.m_stepIndex);
+                else
+                    m_lastRunStepIdx = m_pendingAction.m_stepIndex;
+
                 qDebug() << "[ChaserRunner] Starting from step" << m_lastRunStepIdx << "@ offset" << m_startOffset;
                 startNewStep(m_lastRunStepIdx, timer, m_pendingAction.m_masterIntensity,
                              m_pendingAction.m_stepIntensity, m_pendingAction.m_fadeMode);
