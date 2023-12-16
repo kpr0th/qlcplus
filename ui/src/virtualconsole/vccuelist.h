@@ -295,14 +295,6 @@ public:
     int sideFaderValue();
     bool primaryTop();
 
-signals:
-    void sideFaderButtonToggled();
-    void sideFaderValueChanged();
-
-public slots:
-    void slotSideFaderButtonChecked(bool enable);
-    void slotSetSideFaderValue(int value);
-
     /* Steps - External Value Mode */
     enum StepsExtValueMode
     {
@@ -317,6 +309,15 @@ public slots:
     StepsExtValueMode stringToStepsExtValueMode(QString modeStr);
     QString stepsExtValueModeToString(StepsExtValueMode mode);
     
+
+signals:
+    void sideFaderButtonToggled();
+    void sideFaderValueChanged();
+
+public slots:
+    void slotSideFaderButtonChecked(bool enable);
+    void slotSetSideFaderValue(int value);
+
 
 protected:
     void setFaderInfo(int index);
