@@ -1495,41 +1495,59 @@ void VCCueList::slotInputValueChanged(quint32 universe, quint32 channel, uchar v
         if (sideFaderMode() == None)
             return;
 
-        uchar newValue = value;
-        uchar minValue = 0;
-        uchar maxValue = UCHAR_MAX;
-        if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && chaser() != NULL)
+        Chaser *ch = chaser();
+        if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && ch != NULL)
         {
-            minValue = 1;
-            maxValue = (m_tree->topLevelItemCount() > 0 && m_tree->topLevelItemCount() < UCHAR_MAX) ? m_tree->topLevelItemCount() : UCHAR_MAX;
+            // Use the DMX value as a Direct Step #, and calculate the corresponding
+            // side fader value the same way as VCCueList::slotCurrentStepChanged(#).
 
-            if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
-            {
-                //MIDI input gets multiplied by 2 on the way in; scale min/max range to match
-                minValue = 2;
-                maxValue = ((int)maxValue * 2 < UCHAR_MAX) ? maxValue * 2 : UCHAR_MAX;
-            }
-
-            if (newValue < minValue)
-                newValue = minValue; // cue list #'ing is 1..StepCount; let a 0 value mean step 1
-            if (newValue > maxValue)
-                newValue = maxValue; // don't accept new values higher than the highest step count
-            
-            newValue = (maxValue - newValue + minValue); // invert value since normally 255 means step 1
+            // QUESTION: Could we just call slotCurrentStepChanged (or some equivalent) instead?
+            //  It would simplify the code below if we could...
 
             // KPR0TH TODO: decide if a 0 value should translate to "step 1" or if it should mean "do nothing"
             //    (this was asked in the forums...)
 
-            // KPR0TH TODO: test if this scaling can end up "off by 1" in any circumstances;
-            //    consider implementing similar code as setSideFaderLevel but bypass the conversion
-            //    from 0..255 or 0..100 and go to a directly-specified step # instead.
-            //    (most likely make a new 'setSideFaderLevel(value, bool directStepMode)' and have the 
-            //     existing function call the new one? or just make a similar function with less code...)
-            //    Probably needs to calculate the associated "level" value still???
+            int stepsCount = ch->stepsCount();
+            // sanity check stepsCount ... don't div by 0; don't allow more than the side fader range
+            if (stepsCount > UCHAR_MAX)
+                stepsCount = UCHAR_MAX;
+            if (stepsCount < 1)
+                stepsCount = 1;
+
+            float stepSize = 256.0 / (float)stepsCount; // divide up the full 0..255 range
+            stepSize = qFloor((stepSize * 100000.0) + 0.5) / 100000.0; //round to 5 decimals to fix corner cases
+
+            //MIDI input changes to DMX scale on the way in; return to MIDI scale
+            if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
+                value = value / 2;
+
+            // CueList step #'ing is 1..stepsCount; force input value into that range
+            if (value < 1)
+                value = 1;
+            else if (value > stepsCount)
+                value = stepsCount;
+
+            // Change from step number (1-based) to step index (0-based)
+            value = value - 1;
+
+            // QUESTION: should this check if ch->currentStepIndex() is already correct, 
+            //  and then skip calculating a side fader value and calling setValue if it's already on the desired step?
+
+            // value->step# truncates down in slotSideFaderValueChanged; so use ceiling for step#->value
+            float slValue = stepSize * (float)value;
+            if (slValue > 255)
+                slValue = 255.0;
+            int upperBound = 255 - qCeil(slValue);
+
+            m_sideFader->setValue(upperBound);
+
+            return;
         }
-        float val = SCALE((float) newValue, (float) minValue, (float) maxValue,
-                          (float) m_sideFader->minimum(),
-                          (float) m_sideFader->maximum());
+
+        // Scale the DMX value across the sideFader value range (0..255 or 0..100)
+        float val = SCALE((float) value, (float) 0, (float) UCHAR_MAX,
+                            (float) m_sideFader->minimum(),
+                            (float) m_sideFader->maximum());
         m_sideFader->setValue(val);
     }
 }
