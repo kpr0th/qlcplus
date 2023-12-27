@@ -318,7 +318,6 @@ public slots:
     void slotSideFaderButtonChecked(bool enable);
     void slotSetSideFaderValue(int value);
 
-
 protected:
     void setFaderInfo(int index);
 

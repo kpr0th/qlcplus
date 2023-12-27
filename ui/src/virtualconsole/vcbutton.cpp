@@ -554,22 +554,14 @@ void VCButton::slotInputValueChanged(quint32 universe, quint32 channel, uchar va
         }
         else if (m_action == Toggle && isExtValueModeEnabled()) 
         {
-            // External input sets on/off explicitly based on value, instead of just toggling to the 
-            // opposite state, to avoid unwanted toggling if a MIDI cue or other external input is 
-            // accidentally repeated.
+            // External input explicitly activates or inactivates based on Value
             if (value > 0 && !(state() == Active))
-            {
                 pressFunction();
-            }
             else if (value == 0 && state() == Active)
-            {
-                // **NOTE: a "Monitoring" button (yellow border - running as a child) won't be 
-                //  turned off as currently coded, because it's not "Active".
-                //  This seems OK, because the button wasn't used to turn the function on.
-                //  If this ever needs to change, pressFunction or releaseFunction would also 
-                //  need work to support it.
                 pressFunction();
-            }
+            // **NOTE: a "Monitoring" button (yellow border, running as a child)
+            //  won't turn off here, as currently coded, because it's not "Active".
+            //  This seems OK, since this VCButton didn't turn the associated function on.
         }
         else
         {
@@ -610,7 +602,7 @@ void VCButton::setAction(Action action)
     if (m_action == Blackout)
         setToolTip(tr("Toggle Blackout"));
     else if (m_action == StopAll)
-        setToolTip(tr("Stop ALL functioOns!"));
+        setToolTip(tr("Stop ALL functions!"));
 }
 
 VCButton::Action VCButton::action() const
@@ -745,6 +737,13 @@ void VCButton::pressFunction()
         if (f == NULL)
             return;
 
+        // KPR0TH TODO: verify removing the isChildOfSoloFrame... check is desired!
+        //   [is this the same as my change to make v4 soloframe "mirroring" buttons work the same as v5?]
+
+        // Original comment was:
+        // if the button is in a SoloFrame and the function is running but was
+        // started by a different function (a chaser or collection), turn other
+        // functions off and start this one.
         if (state() == Active) // && !(isChildOfSoloFrame() && f->startedAsChild()))
         {
             f->stop(functionParent());

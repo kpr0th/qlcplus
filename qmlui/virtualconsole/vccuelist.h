@@ -25,21 +25,18 @@
 #include "vcwidget.h"
 
 #define KXMLQLCVCCueList                    QString("CueList")
-//Function
 #define KXMLQLCVCCueListChaser              QString("Chaser")
 #define KXMLQLCVCCueListPlaybackLayout      QString("PlaybackLayout")
 #define KXMLQLCVCCueListNextPrevBehavior    QString("NextPrevBehavior")
 #define KXMLQLCVCCueListCrossfade           QString("Crossfade")
-//Blend
-//Linked
 #define KXMLQLCVCCueListNext                QString("Next")
 #define KXMLQLCVCCueListPrevious            QString("Previous")
 #define KXMLQLCVCCueListPlayback            QString("Playback")
 #define KXMLQLCVCCueListStop                QString("Stop")
-#define KXMLQLCVCCueListCrossfadeLeft       QString("CrossLeft")
-#define KXMLQLCVCCueListCrossfadeRight      QString("CrossRight")
 #define KXMLQLCVCCueListSlidersMode         QString("SlidersMode")
 #define KXMLQLCVCCueListStepsExtValueMode   QString("StepsExtValueMode")
+#define KXMLQLCVCCueListCrossfadeLeft       QString("CrossLeft")
+#define KXMLQLCVCCueListCrossfadeRight      QString("CrossRight")
 
 class ListModel;
 

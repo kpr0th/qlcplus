@@ -551,23 +551,18 @@ void VCButton::slotInputValueChanged(quint8 id, uchar value)
     }
     else if (actionType() == Toggle && extValueModeEnabled())
     {
-        // External input sets on/off explicitly based on value, instead of just toggling to the 
-        // opposite state, to avoid unwanted toggling if a MIDI cue or other external input is 
-        // accidentally repeated.
+        // External input explicitly activates or inactivates based on Value
         if (value > 0 && !(state() == Active))
-        {
             requestStateChange(true);
-        }
         else if (value == 0 && state() == Active)
-        {
-            // **NOTE: a "Monitoring" button (yellow border - running as a child) won't be 
-            //  turned off as currently coded, because it's not "Active".
-            //  This seems OK, because the button wasn't used to turn the function on.
             requestStateChange(false);
-        }
+        // **NOTE: a "Monitoring" button (yellow border, running as a child)
+        //  won't turn off here, as currently coded, because it's not "Active".
+        //  This seems OK, since this VCButton didn't turn the associated function on.
     }
     else
     {
+        // Normal Toggle logic - flip between Active and Inactive if value > 0.
         if (value > 0 && state() == Inactive)
             requestStateChange(true);
         else if (value > 0 && state() == Active)

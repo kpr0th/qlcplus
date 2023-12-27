@@ -1483,31 +1483,39 @@ void VCCueList::slotInputValueChanged(quint32 universe, quint32 channel, uchar v
         if (sideFaderMode() == None)
             return;
 
-        float newValue = (float) value;
-        float minValue = (float) 0;
-        float maxValue = (float) UCHAR_MAX;
+        uchar newValue = value;
+        uchar minValue = 0;
+        uchar maxValue = UCHAR_MAX;
         if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && chaser() != NULL)
         {
-            minValue = (float) 1;
-            maxValue = (float) (m_tree->topLevelItemCount() > 0 ? m_tree->topLevelItemCount() : UCHAR_MAX);
+            minValue = 1;
+            maxValue = (m_tree->topLevelItemCount() > 0 && m_tree->topLevelItemCount() < UCHAR_MAX) ? m_tree->topLevelItemCount() : UCHAR_MAX;
 
             if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
             {
-                minValue = (float) 2;
-                maxValue = maxValue*2; //MIDI input gets multiplied by 2 on the way in; undo it here...
+                //MIDI input gets multiplied by 2 on the way in; scale min/max range to match
+                minValue = 2;
+                maxValue = ((int)maxValue * 2 < UCHAR_MAX) ? maxValue * 2 : UCHAR_MAX;
             }
 
-            if (maxValue > (float) UCHAR_MAX)
-                maxValue = (float) UCHAR_MAX; // but don't allow a max input value higher than max-DMX...
-            
             if (newValue < minValue)
-                newValue = minValue; // cue list #'ing is 1..StepCount; fix a 0 input value to mean step 1 also
+                newValue = minValue; // cue list #'ing is 1..StepCount; let a 0 value mean step 1
             if (newValue > maxValue)
                 newValue = maxValue; // don't accept new values higher than the highest step count
             
             newValue = (maxValue - newValue + minValue); // invert value since normally 255 means step 1
+
+            // KPR0TH TODO: decide if a 0 value should translate to "step 1" or if it should mean "do nothing"
+            //    (this was asked in the forums...)
+
+            // KPR0TH TODO: test if this scaling can end up "off by 1" in any circumstances;
+            //    consider implementing similar code as setSideFaderLevel but bypass the conversion
+            //    from 0..255 or 0..100 and go to a directly-specified step # instead.
+            //    (most likely make a new 'setSideFaderLevel(value, bool directStepMode)' and have the 
+            //     existing function call the new one? or just make a similar function with less code...)
+            //    Probably needs to calculate the associated "level" value still???
         }
-        float val = SCALE(newValue, minValue, maxValue,
+        float val = SCALE((float) newValue, (float) minValue, (float) maxValue,
                           (float) m_sideFader->minimum(),
                           (float) m_sideFader->maximum());
         m_sideFader->setValue(val);

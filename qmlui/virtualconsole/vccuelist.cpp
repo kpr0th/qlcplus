@@ -311,6 +311,13 @@ void VCCueList::setSideFaderLevel(int level)
         ChaserAction action;
         action.m_action = ChaserSetStepIndex;
         action.m_stepIndex = newStep;
+        /** KPR0TH TODO: try to figure out if this action should also specify:
+            action.m_masterIntensity = intensity();         // runs through "requestAttributeOverride()"
+                    [requestAttributeOverride() is a no-op if new value < 0, otherwise it does apply the 0's]
+            action.m_stepIntensity = getPrimaryIntensity(); // same...
+            action.m_fadeMode = getFadeMode();              // when un-specified, no fadeIn/fadeOut gets set
+            [[ look in chaserrunner.cpp which ends up calling startNewStep... ]]
+          (or, do they default to "no change"?) */
         ch->setAction(action);
 
         if (newStep == ch->currentStepIndex())
@@ -733,34 +740,42 @@ void VCCueList::slotInputValueChanged(quint8 id, uchar value)
         break;
         case INPUT_SIDE_FADER_ID:
         {
-            float newValue = (float) value;
-            float minValue = (float) 0;
-            float maxValue = (float) UCHAR_MAX;
+            uchar newValue = value;
+            uchar minValue = 0;
+            uchar maxValue = UCHAR_MAX;
             if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && chaser() != nullptr)
             {
                 Chaser *ch = chaser(); //checked for nullptr above
 
-                minValue = (float) 1;
-                maxValue = (float) (ch->stepsCount() > 0 ? ch->stepsCount() : UCHAR_MAX);
+                minValue = 1;
+                maxValue = (ch->stepsCount() > 0 && ch->stepsCount() < UCHAR_MAX) ? (uchar)ch->stepsCount() : UCHAR_MAX;
 
                 if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
                 {
-                    minValue = (float) 2;
-                    maxValue = maxValue*2; //MIDI input gets multiplied by 2 on the way in; undo it here...
+                    //MIDI input gets multiplied by 2 on the way in; scale min/max range to match
+                    minValue = 2;
+                    maxValue = ((int)maxValue * 2 < UCHAR_MAX) ? maxValue * 2 : UCHAR_MAX; 
                 }
 
-                if (maxValue > (float) UCHAR_MAX)
-                    maxValue = (float) UCHAR_MAX; // but don't allow a max input value higher than max-DMX...
-                
                 if (newValue < minValue)
-                    newValue = minValue; // cue list #'ing is 1..StepCount; fix a 0 input value to mean step 1 also
+                    newValue = minValue; // cue list #'ing is 1..StepCount; let a 0 value mean step 1
                 if (newValue > maxValue)
                     newValue = maxValue; // don't accept new values higher than the highest step count
                 
                 newValue = (maxValue - newValue + minValue); // invert value since normally 255 means step 1
+
+                // KPR0TH TODO: decide if a 0 value should translate to "step 1" or if it should mean "do nothing"
+                //    (this was asked in the forums...)
+
+                // KPR0TH TODO: test if this scaling can end up "off by 1" in any circumstances;
+                //    consider implementing similar code as setSideFaderLevel but bypass the conversion
+                //    from 0..255 or 0..100 and go to a directly-specified step # instead.
+                //    (most likely make a new 'setSideFaderLevel(value, bool directStepMode)' and have the 
+                //     existing function call the new one? or just make a similar function with less code...)
+                //    Probably needs to calculate the associated "level" value still???
             }
 
-            float val = SCALE(newValue, minValue, maxValue, 0,
+            float val = SCALE(float(newValue), float(minValue), float(maxValue), 0,
                               float(sideFaderMode() == Crossfade ? 100 : 255));
             setSideFaderLevel(int(val));
         }
