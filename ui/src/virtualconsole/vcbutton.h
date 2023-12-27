@@ -53,6 +53,7 @@ class QEvent;
 #define KXMLQLCVCButtonActionBlackout   QString("Blackout")
 #define KXMLQLCVCButtonActionStopAll    QString("StopAll")
 
+#define KXMLQLCVCButtonExtValueMode     QString("ExtValueMode")
 #define KXMLQLCVCButtonFlashOverride    QString("Override")
 #define KXMLQLCVCButtonFlashForceLTP    QString("ForceLTP")
 
@@ -270,11 +271,18 @@ public:
     static QString actionToString(Action action);
     static Action stringToAction(const QString& str);
 
+    /**
+     * Toggle by External Value mode
+     */
+    void enableExtValueMode(bool enable);
+    bool isExtValueModeEnabled() const;
+
     void setStopAllFadeOutTime(int ms);
     int stopAllFadeTime() const;
 
 protected:
     Action m_action;
+    bool m_extValueModeEnabled;
     int m_blackoutFadeOutTime;
 
     /*********************************************************************

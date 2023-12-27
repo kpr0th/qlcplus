@@ -41,6 +41,7 @@ VCCueList::VCCueList(Doc *doc, QObject *parent)
     , m_nextPrevBehavior(DefaultRunFirst)
     , m_playbackLayout(PlayPauseStop)
     , m_slidersMode(None)
+    , m_stepsExtValueMode(StepsExtValueModeScaled)
     , m_sideFaderLevel(100)
     , m_nextStepIndex(-1)
     , m_primaryTop(true)
@@ -135,6 +136,12 @@ bool VCCueList::copyFrom(const VCWidget *widget)
 
     setPlaybackLayout(cuelist->playbackLayout());
     setNextPrevBehavior(cuelist->nextPrevBehavior());
+    
+    /* Sliders mode */
+    setSideFaderMode(cuelist->sideFaderMode());
+    
+    /* Steps Ext Value Mode */
+    setStepsExtValueMode(cuelist->stepsExtValueMode());
 
     /* Common stuff */
     return VCWidget::copyFrom(widget);
@@ -234,6 +241,40 @@ QString VCCueList::faderModeToString(VCCueList::FaderMode mode)
         return "Steps";
 
     return "None";
+}
+
+VCCueList::StepsExtValueMode VCCueList::stepsExtValueMode() const
+{
+    return m_stepsExtValueMode;
+}
+
+void VCCueList::setStepsExtValueMode(VCCueList::StepsExtValueMode mode)
+{
+    if (mode == m_stepsExtValueMode)
+        return;
+    
+    m_stepsExtValueMode = mode;
+    emit stepsExtValueModeChanged();
+}
+
+VCCueList::StepsExtValueMode VCCueList::stringToStepsExtValueMode(QString modeStr)
+{
+    if (modeStr == "DirectDMX")
+        return StepsExtValueModeDirectDMX;
+    else if (modeStr == "DirectMIDI")
+        return StepsExtValueModeDirectMIDI;
+
+    return StepsExtValueModeScaled;
+}
+
+QString VCCueList::stepsExtValueModeToString(VCCueList::StepsExtValueMode mode)
+{
+    if (mode == StepsExtValueModeDirectDMX)
+        return "DirectDMX";
+    else if (mode == StepsExtValueModeDirectMIDI)
+        return "DirectMIDI";
+
+    return "Scaled";
 }
 
 int VCCueList::sideFaderLevel() const
@@ -692,7 +733,34 @@ void VCCueList::slotInputValueChanged(quint8 id, uchar value)
         break;
         case INPUT_SIDE_FADER_ID:
         {
-            float val = SCALE(float(value), 0, float(UCHAR_MAX), 0,
+            float newValue = (float) value;
+            float minValue = (float) 0;
+            float maxValue = (float) UCHAR_MAX;
+            if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && chaser() != nullptr)
+            {
+                Chaser *ch = chaser(); //checked for nullptr above
+
+                minValue = (float) 1;
+                maxValue = (float) (ch->stepsCount() > 0 ? ch->stepsCount() : UCHAR_MAX);
+
+                if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
+                {
+                    minValue = (float) 2;
+                    maxValue = maxValue*2; //MIDI input gets multiplied by 2 on the way in; undo it here...
+                }
+
+                if (maxValue > (float) UCHAR_MAX)
+                    maxValue = (float) UCHAR_MAX; // but don't allow a max input value higher than max-DMX...
+                
+                if (newValue < minValue)
+                    newValue = minValue; // cue list #'ing is 1..StepCount; fix a 0 input value to mean step 1 also
+                if (newValue > maxValue)
+                    newValue = maxValue; // don't accept new values higher than the highest step count
+                
+                newValue = (maxValue - newValue + minValue); // invert value since normally 255 means step 1
+            }
+
+            float val = SCALE(newValue, minValue, maxValue, 0,
                               float(sideFaderMode() == Crossfade ? 100 : 255));
             setSideFaderLevel(int(val));
         }
@@ -1002,6 +1070,10 @@ bool VCCueList::loadXML(QXmlStreamReader &root)
         {
             setSideFaderMode(stringToFaderMode(root.readElementText()));
         }
+        else if (root.name() == KXMLQLCVCCueListStepsExtValueMode)
+        {
+            setStepsExtValueMode(stringToStepsExtValueMode(root.readElementText()));
+        }
         else if (root.name() == KXMLQLCVCCueListNext)
         {
             loadXMLSources(root, INPUT_NEXT_STEP_ID);
@@ -1065,6 +1137,10 @@ bool VCCueList::saveXML(QXmlStreamWriter *doc)
     /* Crossfade cue list */
     if (sideFaderMode() != None)
         doc->writeTextElement(KXMLQLCVCCueListSlidersMode, faderModeToString(sideFaderMode()));
+
+    /* Steps External Value Mode */
+    if (stepsExtValueMode() != StepsExtValueModeScaled)
+        doc->writeTextElement(KXMLQLCVCCueListStepsExtValueMode, stepsExtValueModeToString(stepsExtValueMode()));
 
     /* Input controls */
     saveXMLInputControl(doc, INPUT_NEXT_STEP_ID, KXMLQLCVCCueListNext);

@@ -73,6 +73,7 @@ VCButtonProperties::VCButtonProperties(VCButton* button, Doc* doc)
         m_stopAll->setChecked(true);
     else
         m_toggle->setChecked(true);
+    m_toggleExtValueMode->setChecked(m_button->isExtValueModeEnabled());
     m_fadeOutTime = m_button->stopAllFadeTime();
     m_fadeOutEdit->setText(Function::speedToString(m_fadeOutTime));
     slotActionToggled();
@@ -153,6 +154,8 @@ void VCButtonProperties::slotActionToggled()
     m_fadeOutEdit->setEnabled(m_stopAll->isChecked());
     m_safFadeLabel->setEnabled(m_stopAll->isChecked());
     m_speedDialButton->setEnabled(m_stopAll->isChecked());
+    
+    m_toggleExtValueMode->setEnabled(m_toggle->isChecked());
 
     m_forceLTP->setEnabled(m_flash->isChecked());
     m_overridePriority->setEnabled(m_flash->isChecked());
@@ -220,7 +223,10 @@ void VCButtonProperties::accept()
     m_button->setStartupIntensity(qreal(m_intensitySlider->value()) / qreal(100));
 
     if (m_toggle->isChecked() == true)
+    {
         m_button->setAction(VCButton::Toggle);
+        m_button->enableExtValueMode(m_toggleExtValueMode->isChecked());
+    }
     else if (m_blackout->isChecked() == true)
         m_button->setAction(VCButton::Blackout);
     else if (m_stopAll->isChecked() == true)

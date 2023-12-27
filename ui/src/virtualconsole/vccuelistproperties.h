@@ -67,7 +67,8 @@ protected slots:
     void slotChaserAttachClicked();
     void slotChaserDetachClicked();
     void slotPlaybackLayoutChanged();
-
+    void slotSideSliderOptionChanged();
+    
 private:
     void updateChaserName();
     quint32 m_chaserId;

@@ -62,6 +62,8 @@ class Doc;
 #define KXMLQLCVCCueListCrossfadeLeft   QString("CrossLeft")
 #define KXMLQLCVCCueListCrossfadeRight  QString("CrossRight")
 #define KXMLQLCVCCueListSlidersMode     QString("SlidersMode")
+#define KXMLQLCVCCueListStepsExtValueMode QString("StepsExtValueMode")
+
 
 /**
  * VCCueList provides a \ref VirtualConsole widget to control cue lists.
@@ -293,6 +295,21 @@ public:
     int sideFaderValue();
     bool primaryTop();
 
+    /* Steps - External Value Mode */
+    enum StepsExtValueMode
+    {
+        StepsExtValueModeScaled = 0,
+        StepsExtValueModeDirectDMX,
+        StepsExtValueModeDirectMIDI
+    };
+    
+    StepsExtValueMode stepsExtValueMode() const;
+    void setStepsExtValueMode(StepsExtValueMode mode);
+    
+    StepsExtValueMode stringToStepsExtValueMode(QString modeStr);
+    QString stepsExtValueModeToString(StepsExtValueMode mode);
+    
+
 signals:
     void sideFaderButtonToggled();
     void sideFaderValueChanged();
@@ -300,6 +317,7 @@ signals:
 public slots:
     void slotSideFaderButtonChecked(bool enable);
     void slotSetSideFaderValue(int value);
+
 
 protected:
     void setFaderInfo(int index);
@@ -322,6 +340,7 @@ private:
     int m_primaryIndex, m_secondaryIndex;
     bool m_primaryTop;
     FaderMode m_slidersMode;
+    StepsExtValueMode m_stepsExtValueMode;
 
     /*************************************************************************
      * Key sequences

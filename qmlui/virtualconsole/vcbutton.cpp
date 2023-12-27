@@ -35,6 +35,7 @@ VCButton::VCButton(Doc *doc, QObject *parent)
     , m_state(Inactive)
     , m_actionType(Toggle)
     , m_stopAllFadeOutTime(0)
+    , m_extValueModeEnabled(false)
     , m_startupIntensityEnabled(false)
     , m_startupIntensity(1.0)
 {
@@ -111,6 +112,7 @@ bool VCButton::copyFrom(const VCWidget* widget)
     setStartupIntensityEnabled(button->startupIntensityEnabled());
     setStartupIntensity(button->startupIntensity());
     setStopAllFadeOutTime(button->stopAllFadeOutTime());
+    setExtValueModeEnabled(button->extValueModeEnabled());
     setActionType(button->actionType());
     setState(button->state());
 
@@ -465,6 +467,23 @@ int VCButton::stopAllFadeOutTime() const
     return m_stopAllFadeOutTime;
 }
 
+bool VCButton::extValueModeEnabled() const
+{
+    return m_extValueModeEnabled;
+}
+
+void VCButton::setExtValueModeEnabled(bool enable)
+{
+    if (enable == m_extValueModeEnabled)
+        return;
+
+    //?? some things call Tardis::instance()->enqueueAction(...) here - does this one need to for any reason ??
+
+    m_extValueModeEnabled = enable;
+    emit extValueModeChanged();
+}
+
+
 
 /*****************************************************************************
  * Function startup intensity adjustment
@@ -530,6 +549,23 @@ void VCButton::slotInputValueChanged(quint8 id, uchar value)
         else if (state() == Active && value == 0)
             requestStateChange(false);
     }
+    else if (actionType() == Toggle && extValueModeEnabled())
+    {
+        // External input sets on/off explicitly based on value, instead of just toggling to the 
+        // opposite state, to avoid unwanted toggling if a MIDI cue or other external input is 
+        // accidentally repeated.
+        if (value > 0 && !(state() == Active))
+        {
+            requestStateChange(true);
+        }
+        else if (value == 0 && state() == Active)
+        {
+            // **NOTE: a "Monitoring" button (yellow border - running as a child) won't be 
+            //  turned off as currently coded, because it's not "Active".
+            //  This seems OK, because the button wasn't used to turn the function on.
+            requestStateChange(false);
+        }
+    }
     else
     {
         if (value > 0 && state() == Inactive)
@@ -576,6 +612,8 @@ bool VCButton::loadXML(QXmlStreamReader &root)
         else if (root.name() == KXMLQLCVCButtonAction)
         {
             QXmlStreamAttributes attrs = root.attributes();
+            if (attrs.hasAttribute(KXMLQLCVCButtonExtValueMode))
+                setExtValueModeEnabled(attrs.value(KXMLQLCVCButtonExtValueMode) == KXMLQLCTrue);
             if (attrs.hasAttribute(KXMLQLCVCButtonStopAllFadeTime))
                 setStopAllFadeOutTime(attrs.value(KXMLQLCVCButtonStopAllFadeTime).toInt());
 
@@ -637,6 +675,9 @@ bool VCButton::saveXML(QXmlStreamWriter *doc)
 
     /* Action */
     doc->writeStartElement(KXMLQLCVCButtonAction);
+
+    if (actionType() == Toggle && extValueModeEnabled())
+        doc->writeAttribute(KXMLQLCVCButtonExtValueMode, KXMLQLCTrue);
 
     if (actionType() == StopAll && stopAllFadeOutTime() != 0)
     {

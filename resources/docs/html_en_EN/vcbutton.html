@@ -97,7 +97,13 @@ by double clicking the button itself.
    <UL>
     <LI>Toggle Function on/off: When you click the button, the attached Function
     is started. When you click the button a second time, the Function is stopped,
-    unless it has already stopped by itself.</LI>
+    unless it has already stopped by itself.
+    <BR/>
+    Optionally, Toggle mode can be configured to let the External Input value 
+    directly control whether the attached Function is started (value>0) 
+    or stopped (value=0); this may be helpful when external automation is driving
+    the buttons (i.e. via MIDI cues) and it is desirable to avoid toggling lights
+    if the same cue is sent a second time.</DIV></LI>
     <LI>Flash Function: You can "flash" the attached
     <A HREF="concept.html#Scene">Scene</A> when you keep the button pressed. If
     another type of Function is attached to the button, nothing happens when you
