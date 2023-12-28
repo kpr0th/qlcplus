@@ -300,29 +300,32 @@ void VCCueList::setSideFaderLevel(int level)
         int newStep = level; // by default we assume the Chaser has more than 256 steps
         if (ch->stepsCount() < 256)
         {
-            float stepSize = 256 / float(ch->stepsCount()); //divide up the full 0..255 range
+            float stepSize = 256.0 / float(ch->stepsCount()); //divide up the full 0..255 range
             stepSize = qFloor((stepSize * 100000.0) + 0.5) / 100000.0; //round to 5 decimals to fix corner cases
             if (level >= 256.0 - stepSize)
                 newStep = ch->stepsCount() - 1;
             else
                 newStep = qFloor(qreal(level) / qreal(stepSize));
-            //qDebug() << "value:" << value << " new step:" << newStep << " stepSize:" << stepSize;
+            // qDebug() << "level:" << m_sideFaderLevel << " new step:" << newStep << " stepSize:" << stepSize;
         }
 
-        ChaserAction action;
-        action.m_action = ChaserSetStepIndex;
-        action.m_stepIndex = newStep;
-        /** KPR0TH TODO: try to figure out if this action should also specify:
-            action.m_masterIntensity = intensity();         // runs through "requestAttributeOverride()"
-                    [requestAttributeOverride() is a no-op if new value < 0, otherwise it does apply the 0's]
-            action.m_stepIntensity = getPrimaryIntensity(); // same...
-            action.m_fadeMode = getFadeMode();              // when un-specified, no fadeIn/fadeOut gets set
-            [[ look in chaserrunner.cpp which ends up calling startNewStep... ]]
-          (or, do they default to "no change"?) */
-        ch->setAction(action);
+        if (newStep != ch->currentStepIndex())
+        {
+            // Only fire off a SetStepIndex action if the playbackindex needs to change
+            //  (but fall through to the feedback updates every time the level changes)
 
-        if (newStep == ch->currentStepIndex())
-            return;
+            ChaserAction action;
+            action.m_action = ChaserSetStepIndex;
+            action.m_stepIndex = newStep;
+            // Added the following intensities and fademode to the action; 
+            //  without them, chaserrunner was parsing "nan"'s and overriding intensity to 0
+            action.m_masterIntensity = intensity();
+            action.m_stepIntensity = getPrimaryIntensity();
+            action.m_fadeMode = getFadeMode();
+            ch->setAction(action);
+
+            // QUESTION: if the chaser is paused, should we call setPlaybackIndex instead of firing an action?
+        }
     }
     else
     {
@@ -744,51 +747,85 @@ void VCCueList::slotInputValueChanged(quint8 id, uchar value)
             Chaser *ch = chaser();
             if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && ch != nullptr)
             {
-                // Use the DMX value as a Direct Step #, and calculate the corresponding
-                // side fader value the same way as VCCueList::slotCurrentStepChanged(#).
-
-                // QUESTION: should we check first to see if the current step # is already correct?
-                //  Perhaps not necessary; setSideFaderLevel checks if the new level matches the current level.
-
-                // QUESTION: Could we just call slotCurrentStepChanged or setPlaybackIndex instead?
-                //  It would simplify the code below if we could...
-
-                // KPR0TH TODO: decide if a 0 value should translate to "step 1" or if it should mean "do nothing"
-                //    (this was asked in the forums...)
-
-                int stepsCount = ch->stepsCount();
-                // sanity check stepsCount ... don't div by 0; don't allow more than the side fader range
-                if (stepsCount > UCHAR_MAX)
-                    stepsCount = UCHAR_MAX;
-                if (stepsCount < 1)
-                    stepsCount = 1;
-
-                float stepSize = 256.0 / float(stepsCount); // divide up the full 0..255 range
-                stepSize = qFloor((stepSize * 100000.0) + 0.5) / 100000.0; //round to 5 decimals to fix corner cases
+                // Use the External Input value as a Direct Step #
 
                 //MIDI input changes to DMX scale on the way in; return to MIDI scale
                 if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
-                    value = DMX2MIDI(value);
+                    value = value / 2;
 
                 // CueList step #'ing is 1..stepsCount; force input value into that range
                 if (value < 1)
                     value = 1;
-                else if (value > stepsCount)
-                    value = stepsCount;
+                else if (value > ch->stepsCount())
+                    value = ch->stepsCount();
 
                 // Change from step number (1-based) to step index (0-based)
                 value = value - 1;
 
-                // QUESTION: should this check if ch->currentStepIndex() is already correct, 
-                //  and then skip calculating a side fader value and calling setSideFaderLevel if it's already on the desired step?
+                if (value != ch->currentStepIndex())
+                {
+                    /** Queue up an action to jump to the requested step, 
+                     *   but only if the step is changing.
+                     *  Note -- this bypasses updating the Side Fader Level, 
+                     *   to avoid converting from step # to fader level and back again.  
+                     *   It also means the UI reacts similarly to Next/Previous step buttons,
+                     *   which also don't update the fader level. */
 
-                // value->step# truncates down in setSideFaderLevel; so use ceiling for step#->value
-                float slValue = stepSize * (float)value;
-                if (slValue > 255)
-                    slValue = 255.0;
-                int upperBound = 255 - qCeil(slValue);
+                    ChaserAction action;
+                    action.m_action = ChaserSetStepIndex;
+                    action.m_stepIndex = value;
+                    // Added the following intensities and fademode to the action; 
+                    //  without them, chaserrunner was parsing "nan"'s and overriding intensity to 0
+                    action.m_masterIntensity = intensity();
+                    action.m_stepIntensity = getPrimaryIntensity();
+                    action.m_fadeMode = getFadeMode();
+                    ch->setAction(action);
 
-                setSideFaderLevel(upperBound);
+                    // QUESTION: if the chaser is paused, should we call setPlaybackIndex instead of firing an action?
+                }
+
+
+                /** Alternate approach if desired:
+                 *  Calculate a fader level corresponding to the requested step # and call setSideFaderLevel...
+                 *
+                 *  Fully tested but then switched to the above approach instead.
+                 *  Left here for now just in case anyone feels this is a better approach...
+                 *
+                    // Use the DMX value as a Direct Step #, and calculate the corresponding
+                    // side fader value the same way as VCCueList::slotCurrentStepChanged(#).
+
+                    int stepsCount = ch->stepsCount();
+                    // sanity check stepsCount ... don't div by 0; don't allow more than the side fader range
+                    if (stepsCount > UCHAR_MAX)
+                        stepsCount = UCHAR_MAX;
+                    if (stepsCount < 1)
+                        stepsCount = 1;
+
+                    float stepSize = 256.0 / float(stepsCount); // divide up the full 0..255 range
+                    stepSize = qFloor((stepSize * 100000.0) + 0.5) / 100000.0; //round to 5 decimals to fix corner cases
+
+                    //MIDI input changes to DMX scale on the way in; return to MIDI scale
+                    if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
+                        value = value / 2;
+
+                    // CueList step #'ing is 1..stepsCount; force input value into that range
+                    if (value < 1)
+                        value = 1;
+                    else if (value > stepsCount)
+                        value = stepsCount;
+
+                    // Change from step number (1-based) to step index (0-based)
+                    value = value - 1;
+
+                    // value->step# truncates down in setSideFaderLevel; so use ceiling for step#->value
+                    float slValue = stepSize * (float)value;
+                    if (slValue > 255)
+                        slValue = 255.0;
+                    int upperBound = 255 - qCeil(slValue); // NOTE, v5's slider shows 255 at the top
+
+                    setSideFaderLevel(upperBound);
+                 *
+                 * End of Alternate Approach code */
             }
             else
             {

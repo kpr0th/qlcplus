@@ -85,6 +85,7 @@ VCWidgetItem
         property int nextStepIndex: cueListObj ? cueListObj.nextStepIndex : -1
         property bool primaryTop: cueListObj ? cueListObj.primaryTop : true
 
+        onPlaybackIndexChanged: updateLabels()
         onNextStepIndexChanged: updateLabels()
         onPrimaryTopChanged: updateLabels()
 

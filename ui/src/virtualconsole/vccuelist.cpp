@@ -1272,16 +1272,18 @@ void VCCueList::slotSideFaderValueChanged(int value)
             //qDebug() << "value:" << value << " new step:" << newStep << " stepSize:" << stepSize;
         }
 
-        if (newStep == ch->currentStepIndex())
-            return;
-
-        ChaserAction action;
-        action.m_action = ChaserSetStepIndex;
-        action.m_stepIndex = newStep;
-        action.m_masterIntensity = intensity();
-        action.m_stepIntensity = getPrimaryIntensity();
-        action.m_fadeMode = getFadeMode();
-        ch->setAction(action);
+        if (newStep != ch->currentStepIndex())
+        {
+            // Only fire off a SetStepIndex action if the playbackindex needs to change
+            //  (but fall through to the feedback updates every time the level changes)
+            ChaserAction action;
+            action.m_action = ChaserSetStepIndex;
+            action.m_stepIndex = newStep;
+            action.m_masterIntensity = intensity();
+            action.m_stepIntensity = getPrimaryIntensity();
+            action.m_fadeMode = getFadeMode();
+            ch->setAction(action);
+        }
     }
     else
     {
