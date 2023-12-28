@@ -1578,8 +1578,8 @@ void VCCueList::slotInputValueChanged(quint32 universe, quint32 channel, uchar v
 
         // Scale the DMX value across the sideFader value range (0..255 or 0..100)
         float val = SCALE((float) value, (float) 0, (float) UCHAR_MAX,
-                            (float) m_sideFader->minimum(),
-                            (float) m_sideFader->maximum());
+                          (float) m_sideFader->minimum(),
+                          (float) m_sideFader->maximum());
         m_sideFader->setValue(val);
     }
 }
