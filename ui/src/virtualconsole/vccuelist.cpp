@@ -1500,24 +1500,7 @@ void VCCueList::slotInputValueChanged(quint32 universe, quint32 channel, uchar v
         Chaser *ch = chaser();
         if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && ch != NULL)
         {
-            // Use the DMX value as a Direct Step #, and calculate the corresponding
-            // side fader value the same way as VCCueList::slotCurrentStepChanged(#).
-
-            // QUESTION: Could we just call slotCurrentStepChanged (or some equivalent) instead?
-            //  It would simplify the code below if we could...
-
-            // KPR0TH TODO: decide if a 0 value should translate to "step 1" or if it should mean "do nothing"
-            //    (this was asked in the forums...)
-
-            int stepsCount = ch->stepsCount();
-            // sanity check stepsCount ... don't div by 0; don't allow more than the side fader range
-            if (stepsCount > UCHAR_MAX)
-                stepsCount = UCHAR_MAX;
-            if (stepsCount < 1)
-                stepsCount = 1;
-
-            float stepSize = 256.0 / (float)stepsCount; // divide up the full 0..255 range
-            stepSize = qFloor((stepSize * 100000.0) + 0.5) / 100000.0; //round to 5 decimals to fix corner cases
+            // Use the External Input value as a Direct Step #
 
             //MIDI input changes to DMX scale on the way in; return to MIDI scale
             if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
@@ -1526,24 +1509,71 @@ void VCCueList::slotInputValueChanged(quint32 universe, quint32 channel, uchar v
             // CueList step #'ing is 1..stepsCount; force input value into that range
             if (value < 1)
                 value = 1;
-            else if (value > stepsCount)
-                value = stepsCount;
+            else if (value > ch->stepsCount())
+                value = ch->stepsCount();
 
             // Change from step number (1-based) to step index (0-based)
             value = value - 1;
 
-            // QUESTION: should this check if ch->currentStepIndex() is already correct, 
-            //  and then skip calculating a side fader value and calling setValue if it's already on the desired step?
+            if (value != ch->currentStepIndex())
+            {
+                /** Queue up an action to jump to the requested step, but only if the step is changing.
+                 *  Code below was copied from slotSideFaderValueChanged, so as to avoid converting
+                 *  from step# to sideFader value and back to step#. */
 
-            // value->step# truncates down in slotSideFaderValueChanged; so use ceiling for step#->value
-            float slValue = stepSize * (float)value;
-            if (slValue > 255)
-                slValue = 255.0;
-            int upperBound = 255 - qCeil(slValue);
-
-            m_sideFader->setValue(upperBound);
-
+                ChaserAction action;
+                action.m_action = ChaserSetStepIndex;
+                action.m_stepIndex = value;
+                action.m_masterIntensity = intensity();
+                action.m_stepIntensity = getPrimaryIntensity();
+                action.m_fadeMode = getFadeMode();
+                ch->setAction(action);
+            }
             return;
+
+
+            /** Alternate approach if desired:
+             *  Calculate a fader level corresponding to the requested step # and set SideFader value...
+             *
+             *  Fully tested but then switched to the above approach instead.
+             *  Left here for now in case anyone feels this is a better approach...
+             *
+                // Use the DMX value as a Direct Step #, and calculate the corresponding
+                // side fader value the same way as VCCueList::slotCurrentStepChanged(#).
+
+                int stepsCount = ch->stepsCount();
+                // sanity check stepsCount ... don't div by 0; don't allow more than the side fader range
+                if (stepsCount > UCHAR_MAX)
+                    stepsCount = UCHAR_MAX;
+                if (stepsCount < 1)
+                    stepsCount = 1;
+
+                float stepSize = 256.0 / (float)stepsCount; // divide up the full 0..255 range
+                stepSize = qFloor((stepSize * 100000.0) + 0.5) / 100000.0; //round to 5 decimals to fix corner cases
+
+                //MIDI input changes to DMX scale on the way in; return to MIDI scale
+                if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
+                    value = value / 2;
+
+                // CueList step #'ing is 1..stepsCount; force input value into that range
+                if (value < 1)
+                    value = 1;
+                else if (value > stepsCount)
+                    value = stepsCount;
+
+                // Change from step number (1-based) to step index (0-based)
+                value = value - 1;
+
+                // value->step# truncates down in slotSideFaderValueChanged; so use ceiling for step#->value
+                float slValue = stepSize * (float)value;
+                if (slValue > 255)
+                    slValue = 255.0;
+                int upperBound = 255 - qCeil(slValue);
+
+                m_sideFader->setValue(upperBound);
+                return;
+             *
+             * End of Alternate Approach code */
         }
 
         // Scale the DMX value across the sideFader value range (0..255 or 0..100)
