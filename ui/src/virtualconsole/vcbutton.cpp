@@ -740,7 +740,8 @@ void VCButton::pressFunction()
         // if the button is in a SoloFrame and the function is running but was
         // started by a different function (a chaser or collection), turn other
         // functions off and start this one.
-        if (state() == Active && !(isChildOfSoloFrame() && f->startedAsChild()))        {
+        if (state() == Active && !(isChildOfSoloFrame() && f->startedAsChild()))
+        {
             f->stop(functionParent());
             resetIntensityOverrideAttribute();
         }
