@@ -737,15 +737,10 @@ void VCButton::pressFunction()
         if (f == NULL)
             return;
 
-        // KPR0TH TODO: verify removing the isChildOfSoloFrame... check is desired!
-        //   [is this the same as my change to make v4 soloframe "mirroring" buttons work the same as v5?]
-
-        // Original comment was:
         // if the button is in a SoloFrame and the function is running but was
         // started by a different function (a chaser or collection), turn other
         // functions off and start this one.
-        if (state() == Active) // && !(isChildOfSoloFrame() && f->startedAsChild()))
-        {
+        if (state() == Active && !(isChildOfSoloFrame() && f->startedAsChild()))        {
             f->stop(functionParent());
             resetIntensityOverrideAttribute();
         }
