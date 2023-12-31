@@ -1530,50 +1530,6 @@ void VCCueList::slotInputValueChanged(quint32 universe, quint32 channel, uchar v
                 ch->setAction(action);
             }
             return;
-
-
-            /** Alternate approach if desired:
-             *  Calculate a fader level corresponding to the requested step # and set SideFader value...
-             *
-             *  Fully tested but then switched to the above approach instead.
-             *  Left here for now in case anyone feels this is a better approach...
-             *
-                // Use the DMX value as a Direct Step #, and calculate the corresponding
-                // side fader value the same way as VCCueList::slotCurrentStepChanged(#).
-
-                int stepsCount = ch->stepsCount();
-                // sanity check stepsCount ... don't div by 0; don't allow more than the side fader range
-                if (stepsCount > UCHAR_MAX)
-                    stepsCount = UCHAR_MAX;
-                if (stepsCount < 1)
-                    stepsCount = 1;
-
-                float stepSize = 256.0 / (float)stepsCount; // divide up the full 0..255 range
-                stepSize = qFloor((stepSize * 100000.0) + 0.5) / 100000.0; //round to 5 decimals to fix corner cases
-
-                //MIDI input changes to DMX scale on the way in; return to MIDI scale
-                if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
-                    value = value / 2;
-
-                // CueList step #'ing is 1..stepsCount; force input value into that range
-                if (value < 1)
-                    value = 1;
-                else if (value > stepsCount)
-                    value = stepsCount;
-
-                // Change from step number (1-based) to step index (0-based)
-                value = value - 1;
-
-                // value->step# truncates down in slotSideFaderValueChanged; so use ceiling for step#->value
-                float slValue = stepSize * (float)value;
-                if (slValue > 255)
-                    slValue = 255.0;
-                int upperBound = 255 - qCeil(slValue);
-
-                m_sideFader->setValue(upperBound);
-                return;
-             *
-             * End of Alternate Approach code */
         }
 
         // Scale the DMX value across the sideFader value range (0..255 or 0..100)
