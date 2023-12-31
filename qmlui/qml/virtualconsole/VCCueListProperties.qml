@@ -211,5 +211,82 @@ Rectangle
                   }
               }
         }
+        
+        SectionBox
+        {
+            id: stepsExtValueModeProps
+            visible: widgetRef ? widgetRef.sideFaderMode === VCCueList.Steps : false
+            sectionLabel: qsTr("Step Mode for External Input")
+
+            sectionContents:
+              GridLayout
+              {
+                width: parent.width
+                columns: 4
+                columnSpacing: 5
+                rowSpacing: 3
+
+                ButtonGroup { id: stepsExtValueModeGroup }
+
+                // row 1
+                RobotoText
+                {
+                    height: gridItemsHeight
+                    Layout.fillWidth: true
+                    Layout.columnSpan: 3
+                    label: qsTr("Default (scaled 0-255)")
+                }
+
+                CustomCheckBox
+                {
+                    tooltip: qsTr("Default Steps mode, where external input values
+map to step numbers as a scaled percentage of the DMX range.")
+                    implicitWidth: UISettings.iconSizeMedium
+                    implicitHeight: implicitWidth
+                    ButtonGroup.group: stepsExtValueModeGroup
+                    checked: widgetRef ? widgetRef.stepsExtValueMode === VCCueList.StepsExtValueModeScaled : false
+                    onClicked: if (checked && widgetRef) widgetRef.stepsExtValueMode = VCCueList.StepsExtValueModeScaled
+                }
+
+                // row 2
+                RobotoText
+                {
+                    height: gridItemsHeight
+                    Layout.fillWidth: true
+                    label: qsTr("Direct Step #")
+                }
+
+                CustomCheckBox
+                {
+                    tooltip: qsTr("Alternate direct step number mode for external input,
+where the input value is treated as a specific step number.")
+                    implicitWidth: UISettings.iconSizeMedium
+                    implicitHeight: implicitWidth
+                    ButtonGroup.group: stepsExtValueModeGroup
+                    checked: widgetRef ? widgetRef.stepsExtValueMode === VCCueList.StepsExtValueModeDirectDMX : false
+                    onClicked: if (checked && widgetRef) widgetRef.stepsExtValueMode = VCCueList.StepsExtValueModeDirectDMX
+                }
+
+                RobotoText
+                {
+                    height: gridItemsHeight
+                    Layout.fillWidth: true
+                    label: qsTr("Direct (MIDI)")
+                }
+
+                CustomCheckBox
+                {
+                    tooltip: qsTr("Alternate direct step number mode for external input,
+where the input value is treated as a specific step number within the MIDI input range (0..127)")
+                    implicitWidth: UISettings.iconSizeMedium
+                    implicitHeight: implicitWidth
+                    ButtonGroup.group: stepsExtValueModeGroup
+                    checked: widgetRef ? widgetRef.stepsExtValueMode === VCCueList.StepsExtValueModeDirectMIDI : false
+                    onClicked: if (checked && widgetRef) widgetRef.stepsExtValueMode = VCCueList.StepsExtValueModeDirectMIDI
+                }
+
+              } // GridLayout
+        } // SectionBox
+        
     } // Column
 }
