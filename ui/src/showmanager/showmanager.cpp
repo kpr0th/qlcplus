@@ -657,9 +657,15 @@ void ShowManager::slotAddItem()
             /** 2) an existing scene */
             if (selectedFunc->type() == Function::SceneType)
             {
-                m_currentScene = qobject_cast<Scene*>(selectedFunc);
-                newTrackBoundID = selectedFunc->id();
-                createTrack = true;
+                // [change] create copy of selected scene, so the original doesn't get hidden
+                m_currentScene = qobject_cast<Scene*>(selectedFunc->createCopy(m_doc));
+                if (m_currentScene != NULL)
+                {
+                    newTrackBoundID = m_currentScene->id();
+                    createTrack = true;
+                }
+                else 
+                    return;
             }
             else if (selectedFunc->type() == Function::ChaserType)
             {
