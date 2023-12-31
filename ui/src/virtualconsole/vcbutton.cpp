@@ -69,6 +69,7 @@ const QSize VCButton::defaultSize(QSize(50, 50));
 
 VCButton::VCButton(QWidget* parent, Doc* doc) : VCWidget(parent, doc)
     , m_iconPath()
+    , m_extValueModeEnabled(false)
     , m_blackoutFadeOutTime(0)
     , m_startupIntensityEnabled(false)
     , m_startupIntensity(1.0)
@@ -166,6 +167,7 @@ bool VCButton::copyFrom(const VCWidget* widget)
     setStartupIntensity(button->startupIntensity());
     setStopAllFadeOutTime(button->stopAllFadeTime());
     setAction(button->action());
+    enableExtValueMode(button->isExtValueModeEnabled());
     m_state = button->m_state;
 
     m_flashForceLTP = button->flashForceLTP();
@@ -550,6 +552,17 @@ void VCButton::slotInputValueChanged(quint32 universe, quint32 channel, uchar va
             else if (state() == Active && value == 0)
                 releaseFunction();
         }
+        else if (m_action == Toggle && isExtValueModeEnabled()) 
+        {
+            // External input explicitly activates or inactivates based on Value
+            if (value > 0 && !(state() == Active))
+                pressFunction();
+            else if (value == 0 && state() == Active)
+                pressFunction();
+            // **NOTE: a "Monitoring" button (yellow border, running as a child)
+            //  won't turn off here, as currently coded, because it's not "Active".
+            //  This seems OK, since this VCButton didn't turn the associated function on.
+        }
         else
         {
             if (value > 0)
@@ -619,6 +632,16 @@ VCButton::Action VCButton::stringToAction(const QString& str)
         return StopAll;
     else
         return Toggle;
+}
+
+bool VCButton::isExtValueModeEnabled() const
+{
+    return m_extValueModeEnabled;
+}
+
+void VCButton::enableExtValueMode(bool enable)
+{
+    m_extValueModeEnabled = enable;
 }
 
 void VCButton::setStopAllFadeOutTime(int ms)
@@ -943,6 +966,8 @@ bool VCButton::loadXML(QXmlStreamReader &root)
         {
             QXmlStreamAttributes attrs = root.attributes();
             setAction(stringToAction(root.readElementText()));
+            if (attrs.hasAttribute(KXMLQLCVCButtonExtValueMode))
+                enableExtValueMode(attrs.value(KXMLQLCVCButtonExtValueMode) == KXMLQLCTrue);
             if (attrs.hasAttribute(KXMLQLCVCButtonStopAllFadeTime))
                 setStopAllFadeOutTime(attrs.value(KXMLQLCVCButtonStopAllFadeTime).toString().toInt());
 
@@ -1005,6 +1030,10 @@ bool VCButton::saveXML(QXmlStreamWriter *doc)
     /* Action */
     doc->writeStartElement(KXMLQLCVCButtonAction);
 
+    if (action() == Toggle && isExtValueModeEnabled())
+    {
+        doc->writeAttribute(KXMLQLCVCButtonExtValueMode, KXMLQLCTrue);
+    }
     if (action() == StopAll && stopAllFadeTime() != 0)
     {
         doc->writeAttribute(KXMLQLCVCButtonStopAllFadeTime, QString::number(stopAllFadeTime()));

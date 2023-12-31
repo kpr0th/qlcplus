@@ -41,6 +41,7 @@ VCCueList::VCCueList(Doc *doc, QObject *parent)
     , m_nextPrevBehavior(DefaultRunFirst)
     , m_playbackLayout(PlayPauseStop)
     , m_slidersMode(None)
+    , m_stepsExtValueMode(StepsExtValueModeScaled)
     , m_sideFaderLevel(100)
     , m_nextStepIndex(-1)
     , m_primaryTop(true)
@@ -135,6 +136,12 @@ bool VCCueList::copyFrom(const VCWidget *widget)
 
     setPlaybackLayout(cuelist->playbackLayout());
     setNextPrevBehavior(cuelist->nextPrevBehavior());
+    
+    /* Sliders mode */
+    setSideFaderMode(cuelist->sideFaderMode());
+    
+    /* Steps Ext Value Mode */
+    setStepsExtValueMode(cuelist->stepsExtValueMode());
 
     /* Common stuff */
     return VCWidget::copyFrom(widget);
@@ -236,6 +243,40 @@ QString VCCueList::faderModeToString(VCCueList::FaderMode mode)
     return "None";
 }
 
+VCCueList::StepsExtValueMode VCCueList::stepsExtValueMode() const
+{
+    return m_stepsExtValueMode;
+}
+
+void VCCueList::setStepsExtValueMode(VCCueList::StepsExtValueMode mode)
+{
+    if (mode == m_stepsExtValueMode)
+        return;
+    
+    m_stepsExtValueMode = mode;
+    emit stepsExtValueModeChanged();
+}
+
+VCCueList::StepsExtValueMode VCCueList::stringToStepsExtValueMode(QString modeStr)
+{
+    if (modeStr == "DirectDMX")
+        return StepsExtValueModeDirectDMX;
+    else if (modeStr == "DirectMIDI")
+        return StepsExtValueModeDirectMIDI;
+
+    return StepsExtValueModeScaled;
+}
+
+QString VCCueList::stepsExtValueModeToString(VCCueList::StepsExtValueMode mode)
+{
+    if (mode == StepsExtValueModeDirectDMX)
+        return "DirectDMX";
+    else if (mode == StepsExtValueModeDirectMIDI)
+        return "DirectMIDI";
+
+    return "Scaled";
+}
+
 int VCCueList::sideFaderLevel() const
 {
     return m_sideFaderLevel;
@@ -259,22 +300,32 @@ void VCCueList::setSideFaderLevel(int level)
         int newStep = level; // by default we assume the Chaser has more than 256 steps
         if (ch->stepsCount() < 256)
         {
-            float stepSize = 256 / float(ch->stepsCount()); //divide up the full 0..255 range
+            float stepSize = 256.0 / float(ch->stepsCount()); //divide up the full 0..255 range
             stepSize = qFloor((stepSize * 100000.0) + 0.5) / 100000.0; //round to 5 decimals to fix corner cases
             if (level >= 256.0 - stepSize)
                 newStep = ch->stepsCount() - 1;
             else
                 newStep = qFloor(qreal(level) / qreal(stepSize));
-            //qDebug() << "value:" << value << " new step:" << newStep << " stepSize:" << stepSize;
+            // qDebug() << "level:" << m_sideFaderLevel << " new step:" << newStep << " stepSize:" << stepSize;
         }
 
-        ChaserAction action;
-        action.m_action = ChaserSetStepIndex;
-        action.m_stepIndex = newStep;
-        ch->setAction(action);
+        if (newStep != ch->currentStepIndex())
+        {
+            // Only fire off a SetStepIndex action if the playbackindex needs to change
+            //  (but fall through to the feedback updates every time the level changes)
 
-        if (newStep == ch->currentStepIndex())
-            return;
+            ChaserAction action;
+            action.m_action = ChaserSetStepIndex;
+            action.m_stepIndex = newStep;
+            // Added the following intensities and fademode to the action; 
+            //  without them, chaserrunner was parsing "nan"'s and overriding intensity to 0
+            action.m_masterIntensity = intensity();
+            action.m_stepIntensity = getPrimaryIntensity();
+            action.m_fadeMode = getFadeMode();
+            ch->setAction(action);
+
+            // QUESTION: if the chaser is paused, should we call setPlaybackIndex instead of firing an action?
+        }
     }
     else
     {
@@ -693,9 +744,54 @@ void VCCueList::slotInputValueChanged(quint8 id, uchar value)
         break;
         case INPUT_SIDE_FADER_ID:
         {
-            float val = SCALE(float(value), 0, float(UCHAR_MAX), 0,
-                              float(sideFaderMode() == Crossfade ? 100 : 255));
-            setSideFaderLevel(int(val));
+            Chaser *ch = chaser();
+            if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && ch != nullptr)
+            {
+                // Use the External Input value as a Direct Step #
+
+                //MIDI input changes to DMX scale on the way in; return to MIDI scale
+                if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
+                    value = value / 2;
+
+                // CueList step #'ing is 1..stepsCount; force input value into that range
+                if (value < 1)
+                    value = 1;
+                else if (value > ch->stepsCount())
+                    value = ch->stepsCount();
+
+                // Change from step number (1-based) to step index (0-based)
+                value = value - 1;
+
+                if (value != ch->currentStepIndex())
+                {
+                    /** Queue up an action to jump to the requested step, 
+                     *   but only if the step is changing.
+                     *  Note -- this bypasses updating the Side Fader Level, 
+                     *   to avoid converting from step # to fader level and back again.  
+                     *   It also means the UI reacts the same way it does for Next/Previous,
+                     *   step buttons, which also don't update the fader level. */
+
+                    ChaserAction action;
+                    action.m_action = ChaserSetStepIndex;
+                    action.m_stepIndex = value;
+                    // Added the following intensities and fademode to the action; 
+                    //  without them, chaserrunner was parsing "nan"'s and overriding intensity to 0
+                    action.m_masterIntensity = intensity();
+                    action.m_stepIntensity = getPrimaryIntensity();
+                    action.m_fadeMode = getFadeMode();
+                    ch->setAction(action);
+
+                    // QUESTION: if the chaser is paused, should we call setPlaybackIndex instead of firing an action?
+                }
+
+
+            }
+            else
+            {
+                float val = SCALE(float(value), 0, float(UCHAR_MAX), 0,
+                                float(sideFaderMode() == Crossfade ? 100 : 255));
+                setSideFaderLevel(int(val));
+            }
         }
         break;
     }
@@ -1003,6 +1099,10 @@ bool VCCueList::loadXML(QXmlStreamReader &root)
         {
             setSideFaderMode(stringToFaderMode(root.readElementText()));
         }
+        else if (root.name() == KXMLQLCVCCueListStepsExtValueMode)
+        {
+            setStepsExtValueMode(stringToStepsExtValueMode(root.readElementText()));
+        }
         else if (root.name() == KXMLQLCVCCueListNext)
         {
             loadXMLSources(root, INPUT_NEXT_STEP_ID);
@@ -1066,6 +1166,10 @@ bool VCCueList::saveXML(QXmlStreamWriter *doc)
     /* Crossfade cue list */
     if (sideFaderMode() != None)
         doc->writeTextElement(KXMLQLCVCCueListSlidersMode, faderModeToString(sideFaderMode()));
+
+    /* Steps External Value Mode */
+    if (stepsExtValueMode() != StepsExtValueModeScaled)
+        doc->writeTextElement(KXMLQLCVCCueListStepsExtValueMode, stepsExtValueModeToString(stepsExtValueMode()));
 
     /* Input controls */
     saveXMLInputControl(doc, INPUT_NEXT_STEP_ID, KXMLQLCVCCueListNext);

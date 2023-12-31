@@ -109,10 +109,26 @@ VCCueListProperties::VCCueListProperties(VCCueList* cueList, Doc* doc)
      * Crossfade Cue List page
      ************************************************************************/
 
+    groupBox_5->setEnabled(false); // Steps - External Value Mode options
+
     if (cueList->sideFaderMode() == VCCueList::Steps)
+    {
         m_stepsRadio->setChecked(true);
+        groupBox_5->setEnabled(true);
+    }
     else if (cueList->sideFaderMode() == VCCueList::Crossfade)
         m_crossFadeRadio->setChecked(true);
+
+    /* External Value Mode for Side Slider Steps Option */
+    connect(m_noneRadio,      SIGNAL(clicked(bool)), this, SLOT(slotSideSliderOptionChanged()));
+    connect(m_crossFadeRadio, SIGNAL(clicked(bool)), this, SLOT(slotSideSliderOptionChanged()));
+    connect(m_stepsRadio,     SIGNAL(clicked(bool)), this, SLOT(slotSideSliderOptionChanged()));
+    //
+    if (cueList->stepsExtValueMode() == VCCueList::StepsExtValueModeDirectDMX)
+        m_stepsExtValueModeDirectDMX->setChecked(true);
+    else if (cueList->stepsExtValueMode() == VCCueList::StepsExtValueModeDirectMIDI)
+        m_stepsExtValueModeDirectMIDI->setChecked(true);
+
 
     m_crossfadeInputWidget = new InputSelectionWidget(m_doc, this);
     m_crossfadeInputWidget->setTitle(tr("External Input"));
@@ -172,6 +188,13 @@ void VCCueListProperties::accept()
         m_cueList->setSideFaderMode(VCCueList::Steps);
     else
         m_cueList->setSideFaderMode(VCCueList::Crossfade);
+    
+    if (m_stepsExtValueModeScaled->isChecked())
+        m_cueList->setStepsExtValueMode(VCCueList::StepsExtValueModeScaled);
+    else if (m_stepsExtValueModeDirectDMX->isChecked())
+        m_cueList->setStepsExtValueMode(VCCueList::StepsExtValueModeDirectDMX);
+    else
+        m_cueList->setStepsExtValueMode(VCCueList::StepsExtValueModeDirectMIDI);
 
     QDialog::accept();
 }
@@ -220,6 +243,14 @@ void VCCueListProperties::slotPlaybackLayoutChanged()
         m_playInputWidget->setTitle(tr("Play/Stop control"));
         m_stopInputWidget->setTitle(tr("Pause control"));
     }
+}
+
+void VCCueListProperties::slotSideSliderOptionChanged()
+{
+    if (m_stepsRadio->isChecked())
+        groupBox_5->setEnabled(true);
+    else
+        groupBox_5->setEnabled(false);
 }
 
 void VCCueListProperties::updateChaserName()

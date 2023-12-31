@@ -195,40 +195,79 @@ Rectangle
             sectionContents:
               RowLayout
               {
-                  width: parent.width
-                  spacing: 10
+                width: parent.width
+                spacing: 10
 
-                  CustomCheckBox
-                  {
-                      id: startupIntCheck
-                      implicitWidth: UISettings.iconSizeMedium
-                      implicitHeight: implicitWidth
-                      checked: widgetRef ? widgetRef.startupIntensityEnabled : false
-                      onClicked: if (widgetRef) widgetRef.startupIntensityEnabled = checked
-                  }
+                CustomCheckBox
+                {
+                    id: startupIntCheck
+                    implicitWidth: UISettings.iconSizeMedium
+                    implicitHeight: implicitWidth
+                    checked: widgetRef ? widgetRef.startupIntensityEnabled : false
+                    onClicked: if (widgetRef) widgetRef.startupIntensityEnabled = checked
+                }
 
-                  CustomSlider
-                  {
-                      Layout.fillWidth: true
-                      enabled: startupIntCheck.checked
-                      value: widgetRef ? widgetRef.startupIntensity * 100 : 100
-                      onPositionChanged: if (widgetRef) widgetRef.startupIntensity = value / 100
-                  }
+                CustomSlider
+                {
+                    Layout.fillWidth: true
+                    enabled: startupIntCheck.checked
+                    value: widgetRef ? widgetRef.startupIntensity * 100 : 100
+                    onPositionChanged: if (widgetRef) widgetRef.startupIntensity = value / 100
+                }
 
-                  CustomSpinBox
-                  {
-                      id: wSpin
-                      enabled: startupIntCheck.checked
-                      width: UISettings.bigItemHeight * 0.7
-                      height: UISettings.listItemHeight
-                      from: 0
-                      to: 100
-                      suffix: "%"
-                      value: widgetRef ? widgetRef.startupIntensity * 100 : 100
-                      onValueChanged: if (widgetRef) widgetRef.startupIntensity = value / 100
-                  }
+                CustomSpinBox
+                {
+                    id: wSpin
+                    enabled: startupIntCheck.checked
+                    width: UISettings.bigItemHeight * 0.7
+                    height: UISettings.listItemHeight
+                    from: 0
+                    to: 100
+                    suffix: "%"
+                    value: widgetRef ? widgetRef.startupIntensity * 100 : 100
+                    onValueChanged: if (widgetRef) widgetRef.startupIntensity = value / 100
+                }
               }
         }
+
+
+        SectionBox
+        {
+            id: extValueModeProps
+            visible: widgetRef ? widgetRef.actionType === VCButton.Toggle : false
+            sectionLabel: qsTr("Toggle Functions")
+
+            sectionContents:
+              GridLayout
+              {
+                width: parent.width
+                columns: 2
+                columnSpacing: 5
+                rowSpacing: 3
+
+                // row 1
+                RobotoText
+                {
+                    id: evmLabel
+                    height: gridItemsHeight
+                    Layout.fillWidth: true
+                    label: qsTr("Ext. Input Turns ON/OFF by Value")
+                }
+
+                CustomCheckBox
+                {
+                    id: extValueModeCheck
+                    tooltip: qsTr("Same as toggle mode for mouse and keyboard interaction,
+but External Input turns the function ON if value>0 and OFF if value=0")
+                    implicitWidth: UISettings.iconSizeMedium
+                    implicitHeight: implicitWidth
+                    checked: widgetRef ? widgetRef.extValueModeEnabled : false
+                    onClicked: if (widgetRef) widgetRef.extValueModeEnabled = checked
+                }
+
+              } // GridLayout
+        } // SectionBox
+
 
         SectionBox
         {

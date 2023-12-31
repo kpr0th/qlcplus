@@ -93,6 +93,7 @@ VCCueList::VCCueList(QWidget *parent, Doc *doc) : VCWidget(parent, doc)
     , m_secondaryIndex(0)
     , m_primaryTop(true)
     , m_slidersMode(None)
+    , m_stepsExtValueMode(StepsExtValueModeScaled)
 {
     /* Set the class name "VCCueList" as the object name as well */
     setObjectName(VCCueList::staticMetaObject.className());
@@ -324,6 +325,9 @@ bool VCCueList::copyFrom(const VCWidget *widget)
 
     /* Sliders mode */
     setSideFaderMode(cuelist->sideFaderMode());
+    
+    /* Steps Ext Value Mode */
+    setStepsExtValueMode(cuelist->stepsExtValueMode());
 
     /* Common stuff */
     return VCWidget::copyFrom(widget);
@@ -1120,6 +1124,38 @@ QString VCCueList::faderModeToString(VCCueList::FaderMode mode)
     return "None";
 }
 
+
+VCCueList::StepsExtValueMode VCCueList::stepsExtValueMode() const
+{
+    return m_stepsExtValueMode;
+}
+
+void VCCueList::setStepsExtValueMode(VCCueList::StepsExtValueMode mode)
+{
+    m_stepsExtValueMode = mode;
+}
+
+VCCueList::StepsExtValueMode VCCueList::stringToStepsExtValueMode(QString modeStr)
+{
+    if (modeStr == "DirectDMX")
+        return StepsExtValueModeDirectDMX;
+    else if (modeStr == "DirectMIDI")
+        return StepsExtValueModeDirectMIDI;
+
+    return StepsExtValueModeScaled;
+}
+
+QString VCCueList::stepsExtValueModeToString(VCCueList::StepsExtValueMode mode)
+{
+    if (mode == StepsExtValueModeDirectDMX)
+        return "DirectDMX";
+    else if (mode == StepsExtValueModeDirectMIDI)
+        return "DirectMIDI";
+
+    return "Scaled";
+}
+
+
 /*****************************************************************************
  * Crossfade
  *****************************************************************************/
@@ -1236,16 +1272,18 @@ void VCCueList::slotSideFaderValueChanged(int value)
             //qDebug() << "value:" << value << " new step:" << newStep << " stepSize:" << stepSize;
         }
 
-        if (newStep == ch->currentStepIndex())
-            return;
-
-        ChaserAction action;
-        action.m_action = ChaserSetStepIndex;
-        action.m_stepIndex = newStep;
-        action.m_masterIntensity = intensity();
-        action.m_stepIntensity = getPrimaryIntensity();
-        action.m_fadeMode = getFadeMode();
-        ch->setAction(action);
+        if (newStep != ch->currentStepIndex())
+        {
+            // Only fire off a SetStepIndex action if the playbackindex needs to change
+            //  (but fall through to the feedback updates every time the level changes)
+            ChaserAction action;
+            action.m_action = ChaserSetStepIndex;
+            action.m_stepIndex = newStep;
+            action.m_masterIntensity = intensity();
+            action.m_stepIntensity = getPrimaryIntensity();
+            action.m_fadeMode = getFadeMode();
+            ch->setAction(action);
+        }
     }
     else
     {
@@ -1459,6 +1497,42 @@ void VCCueList::slotInputValueChanged(quint32 universe, quint32 channel, uchar v
         if (sideFaderMode() == None)
             return;
 
+        Chaser *ch = chaser();
+        if (sideFaderMode() == Steps && stepsExtValueMode() != StepsExtValueModeScaled && ch != NULL)
+        {
+            // Use the External Input value as a Direct Step #
+
+            //MIDI input changes to DMX scale on the way in; return to MIDI scale
+            if (stepsExtValueMode() == StepsExtValueModeDirectMIDI)
+                value = value / 2;
+
+            // CueList step #'ing is 1..stepsCount; force input value into that range
+            if (value < 1)
+                value = 1;
+            else if (value > ch->stepsCount())
+                value = ch->stepsCount();
+
+            // Change from step number (1-based) to step index (0-based)
+            value = value - 1;
+
+            if (value != ch->currentStepIndex())
+            {
+                /** Queue up an action to jump to the requested step, but only if the step is changing.
+                 *  Code below was copied from slotSideFaderValueChanged, so as to avoid converting
+                 *  from step# to sideFader value and back to step#. */
+
+                ChaserAction action;
+                action.m_action = ChaserSetStepIndex;
+                action.m_stepIndex = value;
+                action.m_masterIntensity = intensity();
+                action.m_stepIntensity = getPrimaryIntensity();
+                action.m_fadeMode = getFadeMode();
+                ch->setAction(action);
+            }
+            return;
+        }
+
+        // Scale the DMX value across the sideFader value range (0..255 or 0..100)
         float val = SCALE((float) value, (float) 0, (float) UCHAR_MAX,
                           (float) m_sideFader->minimum(),
                           (float) m_sideFader->maximum());
@@ -1647,6 +1721,10 @@ bool VCCueList::loadXML(QXmlStreamReader &root)
         {
             setSideFaderMode(stringToFaderMode(root.readElementText()));
         }
+        else if (root.name() == KXMLQLCVCCueListStepsExtValueMode)
+        {
+            setStepsExtValueMode(stringToStepsExtValueMode(root.readElementText()));
+        }
         else if (root.name() == KXMLQLCVCCueListCrossfadeLeft)
         {
             loadXMLSources(root, sideFaderInputSourceId);
@@ -1790,6 +1868,10 @@ bool VCCueList::saveXML(QXmlStreamWriter *doc)
     /* Crossfade cue list */
     if (sideFaderMode() != None)
         doc->writeTextElement(KXMLQLCVCCueListSlidersMode, faderModeToString(sideFaderMode()));
+
+    /* Steps External Value Mode */
+    if (stepsExtValueMode() != StepsExtValueModeScaled)
+        doc->writeTextElement(KXMLQLCVCCueListStepsExtValueMode, stepsExtValueModeToString(stepsExtValueMode()));
 
     QSharedPointer<QLCInputSource> cf1Src = inputSource(sideFaderInputSourceId);
     if (!cf1Src.isNull() && cf1Src->isValid())

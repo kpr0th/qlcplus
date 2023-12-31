@@ -40,17 +40,44 @@
      </property>
      <layout class="QVBoxLayout">
       <item>
-       <widget class="QRadioButton" name="m_toggle">
-        <property name="toolTip">
-         <string>Toggle the assigned function on/off with this button</string>
-        </property>
-        <property name="text">
-         <string>Toggle function on/off</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
+       <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <item>
+         <widget class="QRadioButton" name="m_toggle">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="toolTip">
+           <string>Toggle the assigned function on/off with this button</string>
+          </property>
+          <property name="text">
+           <string>Toggle function on/off</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="m_toggleExtValueMode">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="toolTip">
+           <string>Same as toggle mode for mouse and keyboard interaction,
+but External Input turns the function ON if value>0 and OFF if value=0</string>
+          </property>
+          <property name="text">
+           <string>Turn on/off based on External Input value</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout_4">
